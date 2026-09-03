@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Alexandria', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  
+  /* Institutional Colors */
+  --color-meliere-coral: #F15A3C;
+  --color-meliere-coral-hover: #DE4B2E;
+  --color-meliere-coral-light: #FDF1EE;
+  --color-meliere-coral-border: #FBC3B8;
+  
+  --color-meliere-grafite: #1D1D1D;
+  --color-meliere-grafite-hover: #262626;
+  --color-meliere-grafite-card: #242424;
+  --color-meliere-grafite-border: #333333;
+  --color-meliere-grafite-subtle: #2D2D2D;
+  
+  --color-meliere-gray-light: #EDEEEE;
+  --color-meliere-gray-muted: #F2F3F3;
+  
+  /* Semantic Tokens */
+  --color-surface-base: #F7F7F8;
+  --color-surface-card: #FFFFFF;
+  --color-surface-card-hover: #FAFAFA;
+  --color-surface-dark: #1D1D1D;
+  
+  --color-border-subtle: #E8E9EA;
+  --color-border-medium: #DCDDDE;
+  --color-border-dark: #333333;
+  
+  --color-text-main: #1D1D1D;
+  --color-text-secondary: #666668;
+  --color-text-muted: #9E9EA0;
+  --color-text-inverted: #FFFFFF;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border-subtle);
+  }
+  
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-surface-base);
+    color: var(--color-text-main);
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Custom scrollbar for dense executive UI */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D4D5D6;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B6B7B9;
+}

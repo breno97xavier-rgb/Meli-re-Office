@@ -1,0 +1,6 @@
+{
+  "name": "MELIÈRE OFFICE",
+  "description": "Sistema operacional e central executiva privada da Melière Marketing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
