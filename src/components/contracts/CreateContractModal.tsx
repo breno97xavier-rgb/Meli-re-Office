@@ -10,6 +10,7 @@ import {
   Building2,
   RotateCw,
   Info,
+  DollarSign,
 } from 'lucide-react';
 import { Proposal } from '../../types/proposals';
 import { Contract, CreateContractInput } from '../../types/contracts';
@@ -29,6 +30,14 @@ interface CreateContractModalProps {
 
 const EMPTY_PROPOSALS: Proposal[] = [];
 
+function formatCurrency(val?: number | null): string {
+  if (val === null || val === undefined || isNaN(val)) return '—';
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(val);
+}
+
 export const CreateContractModal: React.FC<CreateContractModalProps> = ({
   isOpen,
   initialProposal,
@@ -46,7 +55,6 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
   const [autoRenewal, setAutoRenewal] = useState(true);
   const [renewalPeriodMonths, setRenewalPeriodMonths] = useState<number | ''>(12);
   const [cancellationNoticeDays, setCancellationNoticeDays] = useState<number | ''>(30);
-  const [specialTerms, setSpecialTerms] = useState('');
   const [notes, setNotes] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -91,7 +99,6 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
       setAutoRenewal(true);
       setRenewalPeriodMonths(12);
       setCancellationNoticeDays(30);
-      setSpecialTerms('');
       setNotes('');
       setValidationError(null);
     }
@@ -140,7 +147,6 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
       auto_renewal: autoRenewal,
       renewal_period_months: autoRenewal && renewalPeriodMonths !== '' ? Number(renewalPeriodMonths) : null,
       cancellation_notice_days: cancellationNoticeDays !== '' ? Number(cancellationNoticeDays) : null,
-      special_terms: specialTerms.trim() || null,
       notes: notes.trim() || null,
     };
 
@@ -179,10 +185,10 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
               </div>
               <div>
                 <h2 className="text-lg font-bold text-[#1D1D1D]">
-                  Formalizar Contrato Comercial
+                  Cadastrar Contrato
                 </h2>
                 <p className="text-xs text-[#666668] mt-0.5">
-                  Gere o contrato jurídico formal em rascunho a partir de uma proposta aceita.
+                  Cadastre o registro operacional do contrato a partir de uma proposta aceita.
                 </p>
               </div>
             </div>
@@ -226,7 +232,7 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
 
               {initialProposal ? (
                 // Read-only presentation when opened from a specific proposal
-                <div className="bg-white border border-[#E8E9EA] rounded-lg p-3 space-y-1.5 shadow-2xs">
+                <div className="bg-white border border-[#E8E9EA] rounded-lg p-3 space-y-2 shadow-2xs">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold text-[#1D1D1D]">
                       {initialProposal.title}
@@ -251,6 +257,26 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
                       )}
                     </div>
                   )}
+
+                  {/* Financial references from proposal */}
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[#E8E9EA] text-xs">
+                    <div>
+                      <span className="text-[#666668] text-[11px] block">Valor Mensal (Recorrente):</span>
+                      <span className="font-semibold text-[#1D1D1D]">
+                        {initialProposal.monthly_amount !== null && initialProposal.monthly_amount !== undefined
+                          ? `${formatCurrency(initialProposal.monthly_amount)} /mês`
+                          : '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[#666668] text-[11px] block">Valor Pontual (Setup/Único):</span>
+                      <span className="font-semibold text-[#1D1D1D]">
+                        {initialProposal.one_time_amount !== null && initialProposal.one_time_amount !== undefined
+                          ? formatCurrency(initialProposal.one_time_amount)
+                          : '—'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               ) : acceptedProposals.length === 0 ? (
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center gap-2">
@@ -260,7 +286,7 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
                   </span>
                 </div>
               ) : (
-                <div>
+                <div className="space-y-2">
                   <select
                     id="select-contract-proposal"
                     value={selectedProposalId}
@@ -274,29 +300,52 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
                     ))}
                   </select>
 
-                  {activeProposal?.opportunity?.lead && (
-                    <div className="mt-2 text-xs text-[#666668] flex items-center gap-1.5 bg-white p-2 rounded-lg border border-[#E8E9EA]">
-                      <User className="w-3.5 h-3.5 text-[#9E9EA0]" />
-                      <span>
-                        Cliente: <strong>{activeProposal.opportunity.lead.name}</strong>
-                        {activeProposal.opportunity.lead.business_name && (
-                          <span className="text-[#9E9EA0]">
-                            {' '}
-                            ({activeProposal.opportunity.lead.business_name})
+                  {activeProposal && (
+                    <div className="bg-white border border-[#E8E9EA] rounded-lg p-3 space-y-2 shadow-2xs">
+                      {activeProposal.opportunity?.lead && (
+                        <div className="text-xs text-[#666668] flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-[#9E9EA0]" />
+                          <span>
+                            Cliente: <strong>{activeProposal.opportunity.lead.name}</strong>
+                            {activeProposal.opportunity.lead.business_name && (
+                              <span className="text-[#9E9EA0]">
+                                {' '}
+                                ({activeProposal.opportunity.lead.business_name})
+                              </span>
+                            )}
                           </span>
-                        )}
-                      </span>
+                        </div>
+                      )}
+
+                      {/* Financial references from proposal */}
+                      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[#E8E9EA] text-xs">
+                        <div>
+                          <span className="text-[#666668] text-[11px] block">Valor Mensal (Recorrente):</span>
+                          <span className="font-semibold text-[#1D1D1D]">
+                            {activeProposal.monthly_amount !== null && activeProposal.monthly_amount !== undefined
+                              ? `${formatCurrency(activeProposal.monthly_amount)} /mês`
+                              : '—'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[#666668] text-[11px] block">Valor Pontual (Setup/Único):</span>
+                          <span className="font-semibold text-[#1D1D1D]">
+                            {activeProposal.one_time_amount !== null && activeProposal.one_time_amount !== undefined
+                              ? formatCurrency(activeProposal.one_time_amount)
+                              : '—'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
               )}
 
-              <p className="text-[11px] text-[#9E9EA0] flex items-center gap-1">
-                <Info className="w-3 h-3" />
-                <span>
-                  O número do contrato (ex: MEL-2026-001) e a versão serão gerados com segurança pelo backend.
-                </span>
-              </p>
+              {/* Notice about external PDF attachment */}
+              <div className="p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-lg flex items-center gap-2 text-xs text-blue-800">
+                <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span>O arquivo PDF do contrato poderá ser anexado diretamente após o cadastro.</span>
+              </div>
             </div>
 
             {/* Contract Title */}
@@ -427,41 +476,22 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
               </div>
             </div>
 
-            {/* Special Terms & Notes */}
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="contract-special-terms"
-                  className="text-xs font-semibold text-[#1D1D1D] uppercase tracking-wider block"
-                >
-                  Condições e Cláusulas Especiais (Opcional)
-                </label>
-                <textarea
-                  id="contract-special-terms"
-                  rows={3}
-                  value={specialTerms}
-                  onChange={(e) => setSpecialTerms(e.target.value)}
-                  placeholder="Especifique cláusulas particulares acordadas com o cliente para este contrato..."
-                  className="w-full bg-white border border-[#D1D2D4] rounded-lg p-3 text-xs text-[#1D1D1D] placeholder-[#9E9EA0] focus:outline-none focus:ring-2 focus:ring-[#F15A3C]/20 focus:border-[#F15A3C] shadow-2xs"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="contract-notes"
-                  className="text-xs font-semibold text-[#1D1D1D] uppercase tracking-wider block"
-                >
-                  Observações Internas (Opcional)
-                </label>
-                <textarea
-                  id="contract-notes"
-                  rows={2}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Anotações internas da equipe comercial / jurídica..."
-                  className="w-full bg-white border border-[#D1D2D4] rounded-lg p-3 text-xs text-[#1D1D1D] placeholder-[#9E9EA0] focus:outline-none focus:ring-2 focus:ring-[#F15A3C]/20 focus:border-[#F15A3C] shadow-2xs"
-                />
-              </div>
+            {/* Notes */}
+            <div className="space-y-1.5">
+              <label
+                htmlFor="contract-notes"
+                className="text-xs font-semibold text-[#1D1D1D] uppercase tracking-wider block"
+              >
+                Observações Internas (Opcional)
+              </label>
+              <textarea
+                id="contract-notes"
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Anotações internas da equipe comercial / jurídica..."
+                className="w-full bg-white border border-[#D1D2D4] rounded-lg p-3 text-xs text-[#1D1D1D] placeholder-[#9E9EA0] focus:outline-none focus:ring-2 focus:ring-[#F15A3C]/20 focus:border-[#F15A3C] shadow-2xs"
+              />
             </div>
           </form>
 
@@ -486,12 +516,12 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Gerando Contrato...</span>
+                  <span>Cadastrando Contrato...</span>
                 </>
               ) : (
                 <>
                   <FileCheck className="w-3.5 h-3.5" />
-                  <span>Gerar Contrato (Rascunho)</span>
+                  <span>Cadastrar Contrato</span>
                 </>
               )}
             </button>

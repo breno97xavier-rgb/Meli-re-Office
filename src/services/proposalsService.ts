@@ -1,7 +1,6 @@
 import { supabase } from '../lib/supabase';
 import {
   Proposal,
-  ProposalItem,
   ProposalStatus,
   CreateProposalInput,
   UpdateProposalInput,
@@ -12,7 +11,6 @@ export async function fetchProposals(): Promise<Proposal[]> {
     .from('proposals')
     .select(`
       *,
-      items:proposal_items(*),
       contracts:contracts(*),
       opportunity:opportunities(
         id,
@@ -35,24 +33,12 @@ export async function fetchProposals(): Promise<Proposal[]> {
     throw new Error(error.message || 'Erro ao carregar propostas.');
   }
 
-  // Ensure items are ordered by display_order ASC
-  const formatted: Proposal[] = (data || []).map((prop) => {
-    const rawItems = Array.isArray(prop.items) ? prop.items : [];
-    const sortedItems = [...rawItems].sort(
-      (a: ProposalItem, b: ProposalItem) => (a.display_order ?? 0) - (b.display_order ?? 0)
-    );
-    return {
-      ...prop,
-      items: sortedItems,
-    } as Proposal;
-  });
-
-  return formatted;
+  return (data || []) as Proposal[];
 }
 
-export async function createProposalWithItems(
+export async function createProposalRecord(
   input: CreateProposalInput
-): Promise<{ proposal: Proposal; items: ProposalItem[] }> {
+): Promise<Proposal> {
   if (!input.opportunity_id) {
     throw new Error('A oportunidade vinculada é obrigatória.');
   }
@@ -61,51 +47,41 @@ export async function createProposalWithItems(
     throw new Error('O título da proposta é obrigatório.');
   }
 
-  if (!input.items || input.items.length === 0) {
-    throw new Error('A proposta deve conter pelo menos um item de serviço.');
+  const monthlyAmount =
+    input.monthly_amount !== undefined && input.monthly_amount !== null
+      ? Number(input.monthly_amount)
+      : null;
+
+  if (monthlyAmount !== null && (isNaN(monthlyAmount) || monthlyAmount < 0)) {
+    throw new Error('O valor mensal não pode ser negativo.');
   }
 
-  const p_items = input.items.map((item, index) => {
-    const desc = item.description?.trim();
-    if (!desc) {
-      throw new Error(`A descrição do item ${index + 1} é obrigatória.`);
-    }
-    const qty = Number(item.quantity);
-    if (isNaN(qty) || qty < 1) {
-      throw new Error(`A quantidade do item "${desc}" deve ser maior ou igual a 1.`);
-    }
-    const price = Number(item.unit_price);
-    if (isNaN(price) || price < 0) {
-      throw new Error(`O preço unitário do item "${desc}" não pode ser negativo.`);
-    }
+  const oneTimeAmount =
+    input.one_time_amount !== undefined && input.one_time_amount !== null
+      ? Number(input.one_time_amount)
+      : null;
 
-    return {
-      description: desc,
-      service_key: item.service_key?.trim() || null,
-      billing_type: item.billing_type,
-      quantity: Math.floor(qty),
-      unit_price: price,
-      display_order: item.display_order ?? index,
-    };
-  });
+  if (oneTimeAmount !== null && (isNaN(oneTimeAmount) || oneTimeAmount < 0)) {
+    throw new Error('O valor pontual não pode ser negativo.');
+  }
 
   const params = {
     p_opportunity_id: input.opportunity_id,
     p_title: input.title.trim(),
     p_valid_until: input.valid_until || null,
     p_notes: input.notes?.trim() || null,
-    p_terms: input.terms?.trim() || null,
-    p_items,
+    p_monthly_amount: monthlyAmount,
+    p_one_time_amount: oneTimeAmount,
   };
 
-  const { data, error } = await supabase.rpc('create_proposal_with_items', params);
+  const { data, error } = await supabase.rpc('create_proposal_record', params);
 
   if (error) {
-    console.error('Error in create_proposal_with_items RPC:', error);
+    console.error('Error in create_proposal_record RPC:', error);
     throw new Error(error.message || 'Erro ao criar proposta comercial.');
   }
 
-  return data as { proposal: Proposal; items: ProposalItem[] };
+  return data as Proposal;
 }
 
 export async function updateProposal(
@@ -121,7 +97,6 @@ export async function updateProposal(
     .eq('id', id)
     .select(`
       *,
-      items:proposal_items(*),
       contracts:contracts(*),
       opportunity:opportunities(
         id,
@@ -144,15 +119,7 @@ export async function updateProposal(
     throw new Error(error.message || 'Erro ao atualizar proposta.');
   }
 
-  const rawItems = Array.isArray(data.items) ? data.items : [];
-  const sortedItems = [...rawItems].sort(
-    (a: ProposalItem, b: ProposalItem) => (a.display_order ?? 0) - (b.display_order ?? 0)
-  );
-
-  return {
-    ...data,
-    items: sortedItems,
-  } as Proposal;
+  return data as Proposal;
 }
 
 export async function updateProposalStatus(

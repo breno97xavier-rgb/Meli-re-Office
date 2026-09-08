@@ -8,6 +8,7 @@ import { LeadsPage } from '@/src/pages/LeadsPage';
 import { OpportunitiesPage } from '@/src/pages/OpportunitiesPage';
 import { ProposalsPage } from '@/src/pages/ProposalsPage';
 import { ContractsPage } from '@/src/pages/ContractsPage';
+import { ClientsPage } from '@/src/pages/ClientsPage';
 import { PlaceholderModulePage } from '@/src/pages/PlaceholderModulePage';
 import { LoginPage } from '@/src/pages/LoginPage';
 import { LoadingGate } from '@/src/components/auth/LoadingGate';
@@ -55,6 +56,8 @@ function AppContent() {
         return <ProposalsPage />;
       case '/comercial/contratos':
         return <ContractsPage />;
+      case '/clientes':
+        return <ClientsPage />;
       default:
         return <PlaceholderModulePage path={currentPath} />;
     }

@@ -16,6 +16,8 @@ export interface Contract {
   version: number;
   title: string;
   status: ContractStatus;
+  monthly_amount: number | null;
+  one_time_amount: number | null;
   start_date: string | null;
   end_date: string | null;
   auto_renewal: boolean;
@@ -50,6 +52,8 @@ export interface CreateContractInput {
 
 export interface UpdateContractOperationalInput {
   title?: string;
+  monthly_amount?: number | null;
+  one_time_amount?: number | null;
   start_date?: string | null;
   end_date?: string | null;
   auto_renewal?: boolean;

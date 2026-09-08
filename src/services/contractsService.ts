@@ -17,17 +17,19 @@ export async function fetchContracts(): Promise<Contract[]> {
         title,
         version,
         status,
+        monthly_amount,
+        one_time_amount,
         created_at,
         valid_until,
         notes,
-        terms,
-        items:proposal_items(*)
+        terms
       ),
       opportunity:opportunities(
         id,
         title,
         stage,
         estimated_value,
+        client_id,
         lead:leads(
           id,
           name,
@@ -52,12 +54,12 @@ export async function fetchEligibleProposals(): Promise<Proposal[]> {
     .from('proposals')
     .select(`
       *,
-      items:proposal_items(*),
       opportunity:opportunities(
         id,
         title,
         stage,
         estimated_value,
+        client_id,
         lead:leads(
           id,
           name,
@@ -162,17 +164,19 @@ export async function transitionContractStatus(
         title,
         version,
         status,
+        monthly_amount,
+        one_time_amount,
         created_at,
         valid_until,
         notes,
-        terms,
-        items:proposal_items(*)
+        terms
       ),
       opportunity:opportunities(
         id,
         title,
         stage,
         estimated_value,
+        client_id,
         lead:leads(
           id,
           name,
@@ -205,6 +209,18 @@ export async function updateContractOperational(
   };
 
   if (updates.title !== undefined) payload.title = updates.title.trim();
+  if (updates.monthly_amount !== undefined) {
+    if (updates.monthly_amount !== null && (isNaN(updates.monthly_amount) || updates.monthly_amount < 0)) {
+      throw new Error('O valor mensal deve ser maior ou igual a zero.');
+    }
+    payload.monthly_amount = updates.monthly_amount;
+  }
+  if (updates.one_time_amount !== undefined) {
+    if (updates.one_time_amount !== null && (isNaN(updates.one_time_amount) || updates.one_time_amount < 0)) {
+      throw new Error('O valor pontual deve ser maior ou igual a zero.');
+    }
+    payload.one_time_amount = updates.one_time_amount;
+  }
   if (updates.start_date !== undefined) payload.start_date = updates.start_date || null;
   if (updates.end_date !== undefined) payload.end_date = updates.end_date || null;
   if (updates.auto_renewal !== undefined) payload.auto_renewal = Boolean(updates.auto_renewal);
@@ -232,17 +248,19 @@ export async function updateContractOperational(
         title,
         version,
         status,
+        monthly_amount,
+        one_time_amount,
         created_at,
         valid_until,
         notes,
-        terms,
-        items:proposal_items(*)
+        terms
       ),
       opportunity:opportunities(
         id,
         title,
         stage,
         estimated_value,
+        client_id,
         lead:leads(
           id,
           name,

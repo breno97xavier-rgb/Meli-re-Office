@@ -7,7 +7,7 @@ import {
 } from '../types/proposals';
 import {
   fetchProposals,
-  createProposalWithItems,
+  createProposalRecord,
   updateProposalStatus,
 } from '../services/proposalsService';
 
@@ -65,16 +65,8 @@ export function useProposals() {
       if (p.status === 'sent') sentCount++;
       if (p.status === 'accepted') {
         acceptedCount++;
-        if (p.items && Array.isArray(p.items)) {
-          for (const item of p.items) {
-            const lineTotal = (item.quantity || 0) * (item.unit_price || 0);
-            if (item.billing_type === 'monthly') {
-              totalAcceptedMonthly += lineTotal;
-            } else if (item.billing_type === 'one_time') {
-              totalAcceptedOneTime += lineTotal;
-            }
-          }
-        }
+        totalAcceptedMonthly += p.monthly_amount ?? 0;
+        totalAcceptedOneTime += p.one_time_amount ?? 0;
       }
     }
 
@@ -92,8 +84,8 @@ export function useProposals() {
       try {
         setIsSubmitting(true);
         setSubmitError(null);
-        const { proposal } = await createProposalWithItems(input);
-        // Reload full proposals to have all joins (opportunity, lead, items) in sync
+        await createProposalRecord(input);
+        // Reload full proposals to have all joins (opportunity, lead) in sync
         await loadProposals();
         return true;
       } catch (err: unknown) {

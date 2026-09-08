@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AlertCircle, RefreshCw, Briefcase, Plus } from 'lucide-react';
 import { useRouter } from '../hooks/useRouter';
 import { useOpportunities } from '../hooks/useOpportunities';
-import { createProposalWithItems } from '../services/proposalsService';
+import { createProposalRecord } from '../services/proposalsService';
 import { Opportunity } from '../types/opportunities';
 import { CreateProposalInput } from '../types/proposals';
 import { CommercialTabs } from '../components/commercial/CommercialTabs';
@@ -49,7 +49,7 @@ export const OpportunitiesPage: React.FC = () => {
     setIsSubmittingProposal(true);
     setProposalSubmitError(null);
     try {
-      await createProposalWithItems(input);
+      await createProposalRecord(input);
       setIsProposalModalOpen(false);
       handleSelectOpportunity(null);
       navigate('/comercial/propostas');

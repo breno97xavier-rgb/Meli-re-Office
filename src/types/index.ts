@@ -65,3 +65,4 @@ export * from './leads';
 export * from './opportunities';
 export * from './proposals';
 export * from './contracts';
+export * from './clients';

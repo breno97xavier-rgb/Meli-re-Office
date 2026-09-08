@@ -30,6 +30,7 @@ export const ContractsPage: React.FC = () => {
     handleCreateContract,
     handleTransitionStatus,
     handleUpdateContract,
+    handleConvertToClient,
     handleSelectContract,
   } = useContracts();
 
@@ -109,6 +110,7 @@ export const ContractsPage: React.FC = () => {
         onClose={() => handleSelectContract(null)}
         onTransitionStatus={handleTransitionStatus}
         onUpdateContract={handleUpdateContract}
+        onConvertToClient={handleConvertToClient}
       />
 
       {/* Create Modal */}

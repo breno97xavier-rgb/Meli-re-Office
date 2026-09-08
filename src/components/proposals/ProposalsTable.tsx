@@ -2,18 +2,15 @@ import React from 'react';
 import {
   FileText,
   User,
-  Building2,
   Calendar,
   AlertTriangle,
   Clock,
-  Layers,
 } from 'lucide-react';
 import { Proposal, ProposalStatus } from '../../types/proposals';
 import {
   ProposalStatusBadge,
   formatCurrency,
   formatDate,
-  calculateProposalTotals,
   isProposalExpired,
 } from './ProposalStatusBadge';
 
@@ -138,8 +135,16 @@ export const ProposalsTable: React.FC<ProposalsTableProps> = ({
             ) : (
               proposals.map((proposal) => {
                 const isSelected = selectedProposalId === proposal.id;
-                const totals = calculateProposalTotals(proposal.items);
                 const expired = isProposalExpired(proposal);
+
+                const hasMonthly =
+                  proposal.monthly_amount !== null &&
+                  proposal.monthly_amount !== undefined &&
+                  proposal.monthly_amount > 0;
+                const hasOneTime =
+                  proposal.one_time_amount !== null &&
+                  proposal.one_time_amount !== undefined &&
+                  proposal.one_time_amount > 0;
 
                 return (
                   <tr
@@ -157,13 +162,6 @@ export const ProposalsTable: React.FC<ProposalsTableProps> = ({
                         </span>
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#F2F3F3] text-[#1D1D1D] border border-[#E8E9EA]">
                           v{proposal.version}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-[#9E9EA0] mt-0.5 flex items-center gap-1.5">
-                        <Layers className="w-3 h-3" />
-                        <span>
-                          {proposal.items?.length || 0}{' '}
-                          {proposal.items?.length === 1 ? 'item' : 'itens'}
                         </span>
                       </div>
                     </td>
@@ -205,25 +203,25 @@ export const ProposalsTable: React.FC<ProposalsTableProps> = ({
                     {/* Valores */}
                     <td className="py-3.5 px-4">
                       <div className="flex flex-col gap-0.5 text-xs">
-                        {totals.monthlyTotal > 0 && (
+                        {hasMonthly && (
                           <div className="font-semibold text-[#1D1D1D]">
-                            {formatCurrency(totals.monthlyTotal)}
+                            {formatCurrency(proposal.monthly_amount)}
                             <span className="text-[10px] font-normal text-[#666668]">
                               {' '}
                               /mês
                             </span>
                           </div>
                         )}
-                        {totals.oneTimeTotal > 0 && (
+                        {hasOneTime && (
                           <div className="text-[#666668] font-medium text-[11px]">
-                            {formatCurrency(totals.oneTimeTotal)}
+                            {formatCurrency(proposal.one_time_amount)}
                             <span className="text-[10px] font-normal text-[#9E9EA0]">
                               {' '}
                               pontual
                             </span>
                           </div>
                         )}
-                        {totals.monthlyTotal === 0 && totals.oneTimeTotal === 0 && (
+                        {!hasMonthly && !hasOneTime && (
                           <span className="text-[#9E9EA0]">—</span>
                         )}
                       </div>

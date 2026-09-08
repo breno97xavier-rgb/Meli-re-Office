@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   User,
+  UserCheck,
   Building2,
   Calendar,
   Clock,
@@ -17,14 +18,22 @@ import {
   Edit3,
   Save,
   AlertTriangle,
-  FileSignature,
-  ExternalLink,
+  Upload,
+  Eye,
+  Download,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  History,
+  DollarSign,
+  Info,
 } from 'lucide-react';
 import {
   Contract,
   ContractStatus,
   UpdateContractOperationalInput,
 } from '../../types/contracts';
+import { Client } from '../../types/clients';
 import {
   ContractStatusBadge,
   getContractStatusLabel,
@@ -34,6 +43,9 @@ import {
   isContractExpiringSoon,
   isContractExpired,
 } from './ContractStatusBadge';
+import { useContractCommercialDocuments } from '../../hooks/useContractCommercialDocuments';
+import { formatBytes } from '../../services/commercialDocumentsService';
+import { CommercialDocument } from '../../types/commercialDocuments';
 
 interface ContractDetailDrawerProps {
   contract: Contract | null;
@@ -52,6 +64,17 @@ interface ContractDetailDrawerProps {
     id: string,
     updates: UpdateContractOperationalInput
   ) => Promise<boolean>;
+  onConvertToClient: (
+    contractId: string
+  ) => Promise<{ success: boolean; client?: Client; error?: string }>;
+}
+
+function formatCurrency(val?: number | null): string {
+  if (val === null || val === undefined || isNaN(val)) return '—';
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(val);
 }
 
 export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
@@ -64,16 +87,18 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
   onClose,
   onTransitionStatus,
   onUpdateContract,
+  onConvertToClient,
 }) => {
-  // Edit mode for draft status
+  // Edit mode state for draft contracts
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState('');
+  const [monthlyAmount, setMonthlyAmount] = useState<number | ''>('');
+  const [oneTimeAmount, setOneTimeAmount] = useState<number | ''>('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [autoRenewal, setAutoRenewal] = useState(true);
   const [renewalPeriodMonths, setRenewalPeriodMonths] = useState<number | ''>(12);
   const [cancellationNoticeDays, setCancellationNoticeDays] = useState<number | ''>(30);
-  const [specialTerms, setSpecialTerms] = useState('');
   const [notes, setNotes] = useState('');
 
   // Status transition modal with reason
@@ -90,20 +115,61 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
   const [reasonError, setReasonError] = useState<string | null>(null);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
 
+  // Conversion to Client modal state
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
+  const [convertError, setConvertError] = useState<string | null>(null);
+
+  // Document management hook
+  const {
+    documents,
+    activeDocument,
+    historyDocuments,
+    loading: loadingDocuments,
+    uploading: uploadingDocument,
+    actionLoadingId,
+    error: documentError,
+    uploadError,
+    setUploadError,
+    uploadDocument,
+    viewDocument,
+    downloadDocument,
+  } = useContractCommercialDocuments(contract?.id);
+
+  // File input refs for uploading / replacing PDF
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const replaceFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Collapsible history state
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
   // Sync edit state when contract changes
   useEffect(() => {
     if (contract) {
       setTitle(contract.title || '');
+      setMonthlyAmount(
+        contract.monthly_amount !== null && contract.monthly_amount !== undefined
+          ? contract.monthly_amount
+          : ''
+      );
+      setOneTimeAmount(
+        contract.one_time_amount !== null && contract.one_time_amount !== undefined
+          ? contract.one_time_amount
+          : ''
+      );
       setStartDate(contract.start_date || '');
       setEndDate(contract.end_date || '');
       setAutoRenewal(Boolean(contract.auto_renewal));
       setRenewalPeriodMonths(contract.renewal_period_months ?? 12);
       setCancellationNoticeDays(contract.cancellation_notice_days ?? 30);
-      setSpecialTerms(contract.special_terms || '');
       setNotes(contract.notes || '');
       setIsEditing(false);
       setReasonModal({ isOpen: false, targetStatus: 'cancelled', reason: '' });
       setReasonError(null);
+      setShowConvertModal(false);
+      setIsConverting(false);
+      setConvertError(null);
+      setIsHistoryOpen(false);
     }
   }, [contract?.id, isOpen]);
 
@@ -114,8 +180,35 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
   const isPending = contract.status === 'pending_signature';
   const isSigned = contract.status === 'signed';
   const isFinal = contract.status === 'cancelled' || contract.status === 'terminated';
+  const isLinkedToClient = Boolean(contract.opportunity?.client_id);
   const expiringSoon = isContractExpiringSoon(contract);
   const expired = isContractExpired(contract);
+
+  const handleConfirmConvertToClient = async () => {
+    if (isConverting) return;
+    try {
+      setIsConverting(true);
+      setConvertError(null);
+      const result = await onConvertToClient(contract.id);
+      if (result.success) {
+        setShowConvertModal(false);
+        setSaveSuccessMessage(
+          'Contrato convertido em cliente com sucesso! O cliente foi iniciado em onboarding.'
+        );
+        setTimeout(() => setSaveSuccessMessage(null), 4000);
+      } else {
+        setConvertError(result.error || 'Erro ao converter contrato em cliente.');
+      }
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'Erro ao converter contrato em cliente.';
+      setConvertError(msg);
+    } finally {
+      setIsConverting(false);
+    }
+  };
 
   const handleSaveEdit = async () => {
     if (!title.trim()) {
@@ -124,12 +217,15 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
 
     const updates: UpdateContractOperationalInput = {
       title: title.trim(),
+      monthly_amount: monthlyAmount === '' ? null : Number(monthlyAmount),
+      one_time_amount: oneTimeAmount === '' ? null : Number(oneTimeAmount),
       start_date: startDate || null,
       end_date: endDate || null,
       auto_renewal: autoRenewal,
-      renewal_period_months: autoRenewal && renewalPeriodMonths !== '' ? Number(renewalPeriodMonths) : null,
-      cancellation_notice_days: cancellationNoticeDays !== '' ? Number(cancellationNoticeDays) : null,
-      special_terms: specialTerms.trim() || null,
+      renewal_period_months:
+        autoRenewal && renewalPeriodMonths !== '' ? Number(renewalPeriodMonths) : null,
+      cancellation_notice_days:
+        cancellationNoticeDays !== '' ? Number(cancellationNoticeDays) : null,
       notes: notes.trim() || null,
     };
 
@@ -142,6 +238,10 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
   };
 
   const handleDirectTransition = async (target: ContractStatus) => {
+    if (target === 'pending_signature' && !activeDocument) {
+      return;
+    }
+
     const ok = await onTransitionStatus(contract.id, target, null);
     if (ok) {
       setSaveSuccessMessage(`Status alterado para ${getContractStatusLabel(target)}.`);
@@ -181,8 +281,48 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
     }
   };
 
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      setUploadError('O arquivo selecionado deve ser obrigatoriamente um PDF.');
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      setUploadError('O arquivo excede o limite máximo permitido de 20 MB.');
+      e.target.value = '';
+      return;
+    }
+
+    const doc = await uploadDocument(file);
+    if (doc) {
+      setSaveSuccessMessage('PDF do contrato anexado com sucesso!');
+      setTimeout(() => setSaveSuccessMessage(null), 3000);
+    }
+    e.target.value = '';
+  };
+
   return (
     <>
+      {/* Hidden file inputs */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelected}
+        accept="application/pdf"
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={replaceFileInputRef}
+        onChange={handleFileSelected}
+        accept="application/pdf"
+        className="hidden"
+      />
+
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-[#1D1D1D]/40 backdrop-blur-xs z-40 transition-opacity"
@@ -270,10 +410,10 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
             </div>
           )}
 
-          {(updateError || transitionError) && (
+          {(updateError || transitionError || documentError) && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-xs text-red-700">
               <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{updateError || transitionError}</span>
+              <span>{updateError || transitionError || documentError}</span>
             </div>
           )}
 
@@ -292,25 +432,33 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
             </div>
 
             {isDraft && (
-              <div className="flex flex-wrap items-center gap-2.5">
-                <button
-                  id="btn-send-to-signature"
-                  onClick={() => handleDirectTransition('pending_signature')}
-                  disabled={isTransitioning || isUpdating}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-[#1D4ED8] hover:bg-[#1E40AF] rounded-lg transition-all cursor-pointer shadow-2xs disabled:opacity-50"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Enviar para Assinatura</span>
-                </button>
-                <button
-                  id="btn-cancel-contract-draft"
-                  onClick={() => handleOpenReasonModal('cancelled')}
-                  disabled={isTransitioning || isUpdating}
-                  className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-red-700 bg-white border border-red-200 hover:bg-red-50 rounded-lg transition-all cursor-pointer shadow-2xs disabled:opacity-50"
-                >
-                  <XCircle className="w-3.5 h-3.5" />
-                  <span>Cancelar Contrato</span>
-                </button>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <button
+                    id="btn-send-to-signature"
+                    onClick={() => handleDirectTransition('pending_signature')}
+                    disabled={isTransitioning || isUpdating || !activeDocument}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-[#1D4ED8] hover:bg-[#1E40AF] rounded-lg transition-all cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Enviar para Assinatura</span>
+                  </button>
+                  <button
+                    id="btn-cancel-contract-draft"
+                    onClick={() => handleOpenReasonModal('cancelled')}
+                    disabled={isTransitioning || isUpdating}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-red-700 bg-white border border-red-200 hover:bg-red-50 rounded-lg transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Cancelar Contrato</span>
+                  </button>
+                </div>
+                {!activeDocument && (
+                  <p className="text-[11px] text-amber-700 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>É necessário anexar o PDF do contrato antes de enviá-lo para assinatura.</span>
+                  </p>
+                )}
               </div>
             )}
 
@@ -338,16 +486,43 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
             )}
 
             {isSigned && (
-              <div className="flex flex-wrap items-center gap-2.5">
-                <button
-                  id="btn-terminate-contract"
-                  onClick={() => handleOpenReasonModal('terminated')}
-                  disabled={isTransitioning || isUpdating}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-[#71717A] bg-white border border-[#D4D4D8] hover:bg-[#F4F4F5] hover:text-[#18181B] rounded-lg transition-all cursor-pointer shadow-2xs disabled:opacity-50"
-                >
-                  <XCircle className="w-3.5 h-3.5 text-zinc-500" />
-                  <span>Encerrar Contrato (Rescisão/Término)</span>
-                </button>
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {!isLinkedToClient && (
+                    <button
+                      id="btn-convert-to-client"
+                      onClick={() => {
+                        setConvertError(null);
+                        setShowConvertModal(true);
+                      }}
+                      disabled={isTransitioning || isUpdating || isConverting}
+                      className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-[#F15A3C] hover:bg-[#d94a2e] rounded-lg transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                    >
+                      <UserCheck className="w-3.5 h-3.5" />
+                      <span>Converter em cliente</span>
+                    </button>
+                  )}
+                  <button
+                    id="btn-terminate-contract"
+                    onClick={() => handleOpenReasonModal('terminated')}
+                    disabled={isTransitioning || isUpdating || isConverting}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-[#71717A] bg-white border border-[#D4D4D8] hover:bg-[#F4F4F5] hover:text-[#18181B] rounded-lg transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                  >
+                    <XCircle className="w-3.5 h-3.5 text-zinc-500" />
+                    <span>Encerrar Contrato (Rescisão/Término)</span>
+                  </button>
+                </div>
+
+                {isLinkedToClient && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3 text-xs text-emerald-800">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span className="font-medium">
+                        Contrato vinculado a cliente ativo no sistema (Onboarding).
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -355,6 +530,191 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
               <div className="text-xs text-[#666668]">
                 Este contrato está em estado final (
                 <strong>{getContractStatusLabel(contract.status)}</strong>) e não permite novas transições.
+              </div>
+            )}
+          </div>
+
+          {/* Section: Documento do Contrato (PDF Management) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-[#666668] uppercase tracking-wider flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-[#F15A3C]" />
+                <span>Documento do Contrato</span>
+              </h3>
+              {loadingDocuments && (
+                <span className="text-[11px] text-[#9E9EA0] flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Carregando...</span>
+                </span>
+              )}
+            </div>
+
+            {uploadError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-xs text-red-700">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{uploadError}</span>
+              </div>
+            )}
+
+            {activeDocument ? (
+              // Active Document Card
+              <div className="bg-white border border-[#E8E9EA] rounded-xl p-4 space-y-3.5 shadow-2xs">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-lg bg-[#FDF1EE] text-[#F15A3C] border border-[#FBC3B8] flex items-center justify-center shrink-0 mt-0.5">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-semibold text-[#1D1D1D] truncate max-w-[280px]">
+                          {activeDocument.original_filename}
+                        </span>
+                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-[#ECFDF5] text-[#047857] border border-[#A7F3D0]">
+                          Ativo
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-[#666668] mt-1">
+                        <span>{formatDateTime(activeDocument.created_at)}</span>
+                        <span>•</span>
+                        <span>{formatBytes(activeDocument.file_size)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions for active document */}
+                <div className="flex items-center gap-2 pt-2 border-t border-[#E8E9EA] flex-wrap">
+                  <button
+                    id="btn-view-contract-pdf"
+                    onClick={() => viewDocument(activeDocument)}
+                    disabled={actionLoadingId === activeDocument.id}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#1D1D1D] bg-white border border-[#E8E9EA] rounded-lg hover:bg-[#F7F7F8] hover:border-[#D1D2D4] transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                  >
+                    {actionLoadingId === activeDocument.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#F15A3C]" />
+                    ) : (
+                      <Eye className="w-3.5 h-3.5 text-[#666668]" />
+                    )}
+                    <span>Visualizar</span>
+                  </button>
+
+                  <button
+                    id="btn-download-contract-pdf"
+                    onClick={() => downloadDocument(activeDocument)}
+                    disabled={actionLoadingId === activeDocument.id}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#1D1D1D] bg-white border border-[#E8E9EA] rounded-lg hover:bg-[#F7F7F8] hover:border-[#D1D2D4] transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                  >
+                    <Download className="w-3.5 h-3.5 text-[#666668]" />
+                    <span>Baixar</span>
+                  </button>
+
+                  <button
+                    id="btn-replace-contract-pdf"
+                    onClick={() => replaceFileInputRef.current?.click()}
+                    disabled={uploadingDocument}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#666668] bg-white border border-[#E8E9EA] rounded-lg hover:bg-[#F7F7F8] hover:text-[#1D1D1D] hover:border-[#D1D2D4] transition-all cursor-pointer shadow-2xs disabled:opacity-50 ml-auto"
+                  >
+                    {uploadingDocument ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#F15A3C]" />
+                    ) : (
+                      <RefreshCw className="w-3.5 h-3.5 text-[#666668]" />
+                    )}
+                    <span>{uploadingDocument ? 'Enviando...' : 'Substituir PDF'}</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Empty State - No active PDF
+              <div className="bg-[#FAFAFA] border border-dashed border-[#D1D2D4] rounded-xl p-5 text-center space-y-3">
+                <div className="w-10 h-10 rounded-full bg-[#F2F3F3] text-[#9E9EA0] flex items-center justify-center mx-auto">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-[#1D1D1D]">
+                    Nenhum arquivo PDF anexado a este contrato
+                  </p>
+                  <p className="text-[11px] text-[#9E9EA0] mt-0.5">
+                    Somente PDF • máximo 20 MB
+                  </p>
+                </div>
+                <button
+                  id="btn-upload-contract-pdf"
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingDocument}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-[#F15A3C] hover:bg-[#d94a2e] rounded-lg transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+                >
+                  {uploadingDocument ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Enviando PDF...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Anexar PDF do Contrato</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Document Version History */}
+            {historyDocuments.length > 0 && (
+              <div className="bg-white border border-[#E8E9EA] rounded-xl overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setIsHistoryOpen((prev) => !prev)}
+                  className="w-full p-3.5 flex items-center justify-between text-xs font-medium text-[#666668] hover:bg-[#FAFAFA] transition-colors cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <History className="w-4 h-4 text-[#9E9EA0]" />
+                    <span>Versões anteriores ({historyDocuments.length})</span>
+                  </span>
+                  {isHistoryOpen ? (
+                    <ChevronUp className="w-4 h-4 text-[#9E9EA0]" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-[#9E9EA0]" />
+                  )}
+                </button>
+
+                {isHistoryOpen && (
+                  <div className="border-t border-[#E8E9EA] divide-y divide-[#E8E9EA]">
+                    {historyDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="p-3.5 flex items-center justify-between gap-3 text-xs bg-[#FAFAFA]/50"
+                      >
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="font-medium text-[#1D1D1D] truncate max-w-[240px]">
+                            {doc.original_filename}
+                          </div>
+                          <div className="text-[11px] text-[#9E9EA0]">
+                            {formatDateTime(doc.created_at)} • {formatBytes(doc.file_size)}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => viewDocument(doc)}
+                            disabled={actionLoadingId === doc.id}
+                            className="p-1.5 text-[#666668] hover:text-[#1D1D1D] hover:bg-white rounded border border-transparent hover:border-[#E8E9EA] transition-all"
+                            title="Visualizar versão antiga"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => downloadDocument(doc)}
+                            disabled={actionLoadingId === doc.id}
+                            className="p-1.5 text-[#666668] hover:text-[#1D1D1D] hover:bg-white rounded border border-transparent hover:border-[#E8E9EA] transition-all"
+                            title="Baixar versão antiga"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -368,7 +728,7 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
                   <span>Editando Contrato em Rascunho</span>
                 </h3>
                 <span className="text-[11px] text-[#666668]">
-                  Apenas dados operacionais editáveis
+                  Dados operacionais e valores
                 </span>
               </div>
 
@@ -382,6 +742,46 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full bg-white border border-[#D1D2D4] rounded-lg px-3 py-2 text-xs text-[#1D1D1D] focus:ring-2 focus:ring-[#F15A3C]/20 focus:border-[#F15A3C]"
                 />
+              </div>
+
+              {/* Financial values (monthly and one_time) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[#1D1D1D]">
+                    Valor Mensal / Recorrente (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={monthlyAmount}
+                    onChange={(e) =>
+                      setMonthlyAmount(
+                        e.target.value === '' ? '' : parseFloat(e.target.value)
+                      )
+                    }
+                    placeholder="Ex: 5000.00"
+                    className="w-full bg-white border border-[#D1D2D4] rounded-lg px-3 py-2 text-xs text-[#1D1D1D] focus:ring-2 focus:ring-[#F15A3C]/20 focus:border-[#F15A3C]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[#1D1D1D]">
+                    Valor Pontual / Setup (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={oneTimeAmount}
+                    onChange={(e) =>
+                      setOneTimeAmount(
+                        e.target.value === '' ? '' : parseFloat(e.target.value)
+                      )
+                    }
+                    placeholder="Ex: 2500.00"
+                    className="w-full bg-white border border-[#D1D2D4] rounded-lg px-3 py-2 text-xs text-[#1D1D1D] focus:ring-2 focus:ring-[#F15A3C]/20 focus:border-[#F15A3C]"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -461,18 +861,6 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
 
               <div className="space-y-1.5 pt-2 border-t border-[#E8E9EA]">
                 <label className="text-xs font-semibold text-[#1D1D1D]">
-                  Condições Especiais
-                </label>
-                <textarea
-                  rows={3}
-                  value={specialTerms}
-                  onChange={(e) => setSpecialTerms(e.target.value)}
-                  className="w-full bg-white border border-[#D1D2D4] rounded-lg p-2.5 text-xs text-[#1D1D1D]"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[#1D1D1D]">
                   Observações Internas
                 </label>
                 <textarea
@@ -513,6 +901,38 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
               </div>
             </div>
           ) : null}
+
+          {/* Section: Valores Contratuais (Monthly & One Time) */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-[#666668] uppercase tracking-wider flex items-center gap-1.5">
+              <DollarSign className="w-3.5 h-3.5 text-[#9E9EA0]" />
+              <span>Valores Contratuais</span>
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-white border border-[#E8E9EA] rounded-xl p-3.5 space-y-1 shadow-2xs">
+                <span className="text-xs text-[#666668] font-medium block">
+                  Valor Mensal (Recorrente)
+                </span>
+                <span className="text-base font-bold text-[#1D1D1D] block">
+                  {contract.monthly_amount !== null && contract.monthly_amount !== undefined
+                    ? `${formatCurrency(contract.monthly_amount)} /mês`
+                    : '—'}
+                </span>
+              </div>
+
+              <div className="bg-white border border-[#E8E9EA] rounded-xl p-3.5 space-y-1 shadow-2xs">
+                <span className="text-xs text-[#666668] font-medium block">
+                  Valor Pontual (Setup / Único)
+                </span>
+                <span className="text-base font-bold text-[#1D1D1D] block">
+                  {contract.one_time_amount !== null && contract.one_time_amount !== undefined
+                    ? formatCurrency(contract.one_time_amount)
+                    : '—'}
+                </span>
+              </div>
+            </div>
+          </div>
 
           {/* Section: Origem Comercial */}
           <div className="space-y-3">
@@ -561,6 +981,17 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
                         • {contract.opportunity.lead.email}
                       </span>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Status de Cliente Vinculado */}
+              {isLinkedToClient && (
+                <div className="p-3.5 flex items-center justify-between gap-4 bg-emerald-50/40">
+                  <div className="text-xs text-[#666668]">Status como Cliente</div>
+                  <div className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>Convertido em Cliente (Onboarding)</span>
                   </div>
                 </div>
               )}
@@ -641,29 +1072,26 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
             </div>
           </div>
 
-          {/* Section: Condições Especiais & Notas */}
+          {/* Section: Condições Legadas & Observações */}
           <div className="space-y-3">
             <h3 className="text-xs font-semibold text-[#666668] uppercase tracking-wider">
-              Condições e Observações
+              Observações e Cláusulas
             </h3>
 
             <div className="bg-white border border-[#E8E9EA] rounded-xl divide-y divide-[#E8E9EA]">
-              {contract.special_terms ? (
-                <div className="p-3.5 space-y-1">
-                  <div className="text-xs text-[#666668] font-medium">
-                    Condições / Cláusulas Especiais
+              {contract.special_terms && (
+                <div className="p-3.5 space-y-1 bg-amber-50/40">
+                  <div className="text-xs text-amber-800 font-medium flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Condições Especiais Registradas (Legado)</span>
                   </div>
-                  <div className="text-xs text-[#1D1D1D] whitespace-pre-wrap leading-relaxed bg-[#F9F9FA] p-3 rounded-lg border border-[#E8E9EA]">
+                  <div className="text-xs text-[#1D1D1D] whitespace-pre-wrap leading-relaxed bg-white p-3 rounded-lg border border-amber-200">
                     {contract.special_terms}
                   </div>
                 </div>
-              ) : (
-                <div className="p-3.5 text-xs text-[#9E9EA0]">
-                  Nenhuma cláusula especial registrada.
-                </div>
               )}
 
-              {contract.notes && (
+              {contract.notes ? (
                 <div className="p-3.5 space-y-1">
                   <div className="text-xs text-[#666668] font-medium">
                     Observações Internas
@@ -672,6 +1100,12 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
                     {contract.notes}
                   </div>
                 </div>
+              ) : (
+                !contract.special_terms && (
+                  <div className="p-3.5 text-xs text-[#9E9EA0]">
+                    Nenhuma observação interna registrada.
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -881,6 +1315,74 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
                       ? 'Cancelamento'
                       : 'Encerramento'}
                   </span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Convert to Client Confirmation Modal */}
+      {showConvertModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-[#1D1D1D]/50 backdrop-blur-xs">
+          <div
+            id="convert-client-modal"
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-[#E8E9EA] overflow-hidden animate-in zoom-in-95 duration-150"
+          >
+            <div className="px-6 py-4 border-b border-[#E8E9EA] bg-[#FAFAFA] flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[#1D1D1D] font-bold text-sm">
+                <UserCheck className="w-4 h-4 text-[#F15A3C]" />
+                <span>Converter este contrato em cliente?</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => !isConverting && setShowConvertModal(false)}
+                disabled={isConverting}
+                className="p-1 text-[#666668] hover:text-[#1D1D1D] rounded-lg disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-[#666668] leading-relaxed">
+                O cliente será criado em onboarding e vinculado ao histórico comercial existente.
+              </p>
+
+              {convertError && (
+                <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{convertError}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-3.5 border-t border-[#E8E9EA] bg-[#FAFAFA] flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowConvertModal(false)}
+                disabled={isConverting}
+                className="px-3.5 py-2 text-xs font-medium text-[#666668] bg-white border border-[#E8E9EA] rounded-lg hover:bg-[#F2F3F3] disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                id="btn-confirm-convert-client"
+                onClick={handleConfirmConvertToClient}
+                disabled={isConverting}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#F15A3C] hover:bg-[#d94a2e] rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                {isConverting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Convertendo...</span>
+                  </>
+                ) : (
+                  <>
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Converter em cliente</span>
+                  </>
                 )}
               </button>
             </div>

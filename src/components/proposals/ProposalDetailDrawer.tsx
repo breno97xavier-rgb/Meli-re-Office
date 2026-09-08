@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   X,
   User,
-  Building2,
   Calendar,
   Clock,
   Send,
@@ -12,13 +11,19 @@ import {
   AlertCircle,
   Loader2,
   Check,
-  Layers,
   Sparkles,
   DollarSign,
   AlertTriangle,
   FileCheck,
   Plus,
   ArrowRight,
+  Upload,
+  Eye,
+  Download,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  History,
 } from 'lucide-react';
 import {
   Proposal,
@@ -27,21 +32,18 @@ import {
 import {
   ProposalStatusBadge,
   getStatusLabel,
-  getBillingTypeLabel,
   formatCurrency,
   formatDate,
   formatDateTime,
-  calculateProposalTotals,
   isProposalExpired,
 } from './ProposalStatusBadge';
 import { ContractStatusBadge } from '../contracts/ContractStatusBadge';
 import { CreateContractModal } from '../contracts/CreateContractModal';
-import { ProposalDocumentEditor } from './ProposalDocumentEditor';
-import { ProposalDocumentPreviewModal } from './document/ProposalDocumentPreviewModal';
 import { createContractFromProposal } from '../../services/contractsService';
 import { CreateContractInput, Contract } from '../../types/contracts';
 import { useRouter } from '../../hooks/useRouter';
-import { Eye, Edit3 } from 'lucide-react';
+import { useProposalCommercialDocuments } from '../../hooks/useProposalCommercialDocuments';
+import { formatBytes } from '../../services/commercialDocumentsService';
 
 interface ProposalDetailDrawerProps {
   proposal: Proposal | null;
@@ -72,20 +74,31 @@ export const ProposalDetailDrawer: React.FC<ProposalDetailDrawerProps> = ({
 }) => {
   const router = useRouter();
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Hook for managing proposal commercial PDF documents
+  const {
+    activeDocument,
+    historyDocuments,
+    loading: loadingDocs,
+    uploading,
+    actionLoadingId,
+    error: docError,
+    uploadError,
+    setUploadError,
+    uploadDocument,
+    viewDocument,
+    downloadDocument,
+  } = useProposalCommercialDocuments(proposal?.id);
 
   // Contract creation modal state
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [isSubmittingContract, setIsSubmittingContract] = useState(false);
   const [contractSubmitError, setContractSubmitError] = useState<string | null>(null);
 
-  // Proposal Document Editor modal state
-  const [isDocumentEditorOpen, setIsDocumentEditorOpen] = useState(false);
-  // Proposal Document Preview modal state
-  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
-
   if (!isOpen || !proposal) return null;
 
-  const totals = calculateProposalTotals(proposal.items);
   const expired = isProposalExpired(proposal);
 
   // Find latest contract associated with this proposal
@@ -97,11 +110,49 @@ export const ProposalDetailDrawer: React.FC<ProposalDetailDrawerProps> = ({
 
   const handleStatusChange = async (newStatus: ProposalStatus) => {
     if (newStatus === proposal.status) return;
+
+    // UX check: cannot change to 'sent' without active PDF
+    if (newStatus === 'sent' && !activeDocument) {
+      setUploadError('Anexe o PDF da proposta antes de marcá-la como enviada.');
+      return;
+    }
+
     const ok = await onUpdateStatus(proposal.id, newStatus);
     if (ok) {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     }
+  };
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input value so same file can be selected again if needed
+    e.target.value = '';
+
+    // Frontend validation
+    if (file.type !== 'application/pdf') {
+      setUploadError('O arquivo deve ser obrigatoriamente do tipo PDF (application/pdf).');
+      return;
+    }
+
+    if (file.size <= 0) {
+      setUploadError('O arquivo selecionado está vazio (0 bytes).');
+      return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      setUploadError('O arquivo excede o limite máximo permitido de 20 MB.');
+      return;
+    }
+
+    await uploadDocument(file);
+  };
+
+  const handleTriggerUpload = () => {
+    setUploadError(null);
+    fileInputRef.current?.click();
   };
 
   const handleCreateContract = async (
@@ -130,6 +181,15 @@ export const ProposalDetailDrawer: React.FC<ProposalDetailDrawerProps> = ({
 
   return (
     <>
+      {/* Hidden File Input for PDF Upload & Replacement */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-[#1D1D1D]/40 backdrop-blur-xs z-40 transition-opacity"
@@ -227,13 +287,25 @@ export const ProposalDetailDrawer: React.FC<ProposalDetailDrawerProps> = ({
                 }
                 className="w-full bg-white border border-[#D1D2D4] rounded-lg px-3.5 py-2.5 text-sm font-medium text-[#1D1D1D] shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#F15A3C]/20 focus:border-[#F15A3C] disabled:opacity-60 cursor-pointer"
               >
-                {STATUS_OPTIONS.map((st) => (
-                  <option key={st} value={st}>
-                    {getStatusLabel(st)}
-                  </option>
-                ))}
+                {STATUS_OPTIONS.map((st) => {
+                  const isSentBlocked = st === 'sent' && !activeDocument;
+                  return (
+                    <option key={st} value={st} disabled={isSentBlocked}>
+                      {getStatusLabel(st)}
+                      {isSentBlocked ? ' (requer PDF anexado)' : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
+
+            {/* Hint when in draft and missing PDF */}
+            {proposal.status === 'draft' && !activeDocument && (
+              <p className="text-[11px] text-[#9E9EA0] flex items-center gap-1">
+                <AlertCircle className="w-3 h-3 text-[#9E9EA0]" />
+                <span>Anexe o PDF da proposta antes de marcá-la como enviada.</span>
+              </p>
+            )}
 
             {updateError && (
               <div className="flex items-center gap-2 p-2.5 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg">
@@ -243,43 +315,220 @@ export const ProposalDetailDrawer: React.FC<ProposalDetailDrawerProps> = ({
             )}
           </div>
 
-          {/* Section: Commercial Document */}
-          <div className="bg-white border border-[#E8E9EA] rounded-xl p-4.5 space-y-3 shadow-2xs">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
+          {/* Section: Documento da Proposta (Gestão do PDF F1.5R5) */}
+          <div className="bg-[#F7F7F8] border border-[#E8E9EA] rounded-xl p-4.5 space-y-3.5 shadow-2xs">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-[#FDF1EE] text-[#F15A3C] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-white border border-[#E8E9EA] text-[#F15A3C] flex items-center justify-center">
                   <FileText className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-xs font-bold text-[#1D1D1D] uppercase tracking-wider">
-                    Documento Comercial
+                    Documento da Proposta
                   </h3>
                   <p className="text-[11px] text-[#666668]">
-                    Defina introdução, escopo executivo e entregáveis desta proposta.
+                    {activeDocument
+                      ? 'Arquivo PDF ativo da proposta comercial.'
+                      : 'Nenhum PDF anexado.'}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              {/* Botão de Anexar quando não há PDF ativo */}
+              {!activeDocument && !loadingDocs && (
                 <button
-                  id="btn-open-document-editor"
-                  onClick={() => setIsDocumentEditorOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#F15A3C] hover:bg-[#d94a2e] rounded-lg transition-colors cursor-pointer shadow-2xs"
+                  id="btn-attach-proposal-pdf"
+                  type="button"
+                  onClick={handleTriggerUpload}
+                  disabled={uploading}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#F15A3C] hover:bg-[#d94a2e] rounded-lg transition-colors cursor-pointer shadow-2xs disabled:opacity-60"
                 >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Preparar documento</span>
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Anexar PDF</span>
                 </button>
+              )}
+            </div>
 
+            {/* Feedback de erro de upload ou documento */}
+            {(uploadError || docError) && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-xs text-red-800">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span className="flex-1">{uploadError || docError}</span>
                 <button
-                  id="btn-preview-proposal"
-                  onClick={() => setIsPreviewModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#1D1D1D] hover:text-[#F15A3C] bg-white hover:bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg transition-colors cursor-pointer shadow-2xs"
+                  onClick={() => setUploadError(null)}
+                  className="text-red-600 hover:text-red-800"
                 >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Visualizar proposta</span>
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
-            </div>
+            )}
+
+            {/* Loading do documento */}
+            {loadingDocs && (
+              <div className="flex items-center gap-2 py-3 text-xs text-[#666668]">
+                <Loader2 className="w-4 h-4 animate-spin text-[#F15A3C]" />
+                <span>Carregando documento...</span>
+              </div>
+            )}
+
+            {/* Estado durante Upload */}
+            {uploading && (
+              <div className="bg-white border border-[#E8E9EA] rounded-xl p-3.5 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#FDF1EE] text-[#F15A3C] flex items-center justify-center shrink-0">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-[#1D1D1D]">
+                    Enviando PDF da proposta...
+                  </p>
+                  <p className="text-[11px] text-[#666668]">
+                    Armazenando e registrando documento comercial.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Estado Sem PDF Ativo */}
+            {!activeDocument && !loadingDocs && !uploading && (
+              <div className="bg-white border border-dashed border-[#D1D2D4] rounded-xl p-4 text-center space-y-1">
+                <p className="text-xs font-medium text-[#1D1D1D]">
+                  Nenhum arquivo PDF anexado a esta proposta.
+                </p>
+                <p className="text-[11px] text-[#9E9EA0]">
+                  Somente PDF • máximo 20 MB
+                </p>
+              </div>
+            )}
+
+            {/* Estado Com PDF Ativo */}
+            {activeDocument && !uploading && (
+              <div className="bg-white border border-[#E8E9EA] rounded-xl p-3.5 space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-lg bg-[#FDF1EE] text-[#F15A3C] flex items-center justify-center shrink-0">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-[#1D1D1D] truncate max-w-xs sm:max-w-sm">
+                        {activeDocument.original_filename}
+                      </p>
+                      <div className="flex items-center gap-2 text-[11px] text-[#666668] mt-0.5">
+                        <span>{formatBytes(activeDocument.file_size)}</span>
+                        <span>•</span>
+                        <span>
+                          Enviado em {formatDateTime(activeDocument.created_at)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0] shrink-0">
+                    Ativo
+                  </span>
+                </div>
+
+                {/* Ações do PDF Ativo */}
+                <div className="pt-2 border-t border-[#E8E9EA] flex items-center gap-2 flex-wrap">
+                  <button
+                    id="btn-view-active-pdf"
+                    type="button"
+                    disabled={actionLoadingId === activeDocument.id}
+                    onClick={() => viewDocument(activeDocument)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#1D1D1D] hover:text-[#F15A3C] bg-[#F7F7F8] hover:bg-[#F2F3F3] border border-[#E8E9EA] rounded-lg transition-colors cursor-pointer"
+                  >
+                    {actionLoadingId === activeDocument.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Eye className="w-3.5 h-3.5" />
+                    )}
+                    <span>Visualizar</span>
+                  </button>
+
+                  <button
+                    id="btn-download-active-pdf"
+                    type="button"
+                    disabled={actionLoadingId === activeDocument.id}
+                    onClick={() => downloadDocument(activeDocument)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#1D1D1D] hover:text-[#F15A3C] bg-[#F7F7F8] hover:bg-[#F2F3F3] border border-[#E8E9EA] rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Baixar</span>
+                  </button>
+
+                  <button
+                    id="btn-replace-active-pdf"
+                    type="button"
+                    onClick={handleTriggerUpload}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#666668] hover:text-[#1D1D1D] hover:bg-[#F2F3F3] border border-transparent rounded-lg transition-colors cursor-pointer ml-auto"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Substituir PDF</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Histórico de Versões Anteriores */}
+            {historyDocuments.length > 0 && (
+              <div className="pt-2 border-t border-[#E8E9EA]">
+                <button
+                  type="button"
+                  onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+                  className="w-full flex items-center justify-between text-xs font-medium text-[#666668] hover:text-[#1D1D1D] transition-colors py-1 cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <History className="w-3.5 h-3.5 text-[#9E9EA0]" />
+                    <span>Versões anteriores ({historyDocuments.length})</span>
+                  </span>
+                  {isHistoryExpanded ? (
+                    <ChevronUp className="w-3.5 h-3.5" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  )}
+                </button>
+
+                {isHistoryExpanded && (
+                  <div className="mt-2 space-y-2">
+                    {historyDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="bg-white border border-[#E8E9EA] rounded-lg p-2.5 flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-[#1D1D1D] truncate max-w-xs">
+                            {doc.original_filename}
+                          </p>
+                          <p className="text-[10px] text-[#9E9EA0]">
+                            {formatDateTime(doc.created_at)} • {formatBytes(doc.file_size)}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            disabled={actionLoadingId === doc.id}
+                            onClick={() => viewDocument(doc)}
+                            title="Visualizar versão anterior"
+                            className="p-1.5 text-[#666668] hover:text-[#1D1D1D] hover:bg-[#F2F3F3] rounded transition-colors cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={actionLoadingId === doc.id}
+                            onClick={() => downloadDocument(doc)}
+                            title="Baixar versão anterior"
+                            className="p-1.5 text-[#666668] hover:text-[#1D1D1D] hover:bg-[#F2F3F3] rounded transition-colors cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Section: Contract Formalization (When Accepted) */}
@@ -357,98 +606,37 @@ export const ProposalDetailDrawer: React.FC<ProposalDetailDrawerProps> = ({
             </div>
           )}
 
-          {/* Totals Summary Cards */}
+          {/* Direct Commercial Totals Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div className="bg-white border border-[#E8E9EA] rounded-xl p-4 shadow-2xs space-y-1">
               <span className="text-xs font-medium text-[#666668] flex items-center gap-1.5">
                 <DollarSign className="w-3.5 h-3.5 text-[#F15A3C]" />
-                <span>Faturamento Mensal (Recorrente)</span>
+                <span>Valor Mensal Proposto</span>
               </span>
               <div className="text-xl font-bold text-[#1D1D1D]">
-                {formatCurrency(totals.monthlyTotal)}
-                <span className="text-xs font-normal text-[#666668]"> /mês</span>
+                {proposal.monthly_amount !== null && proposal.monthly_amount !== undefined ? (
+                  <>
+                    {formatCurrency(proposal.monthly_amount)}
+                    <span className="text-xs font-normal text-[#666668]"> /mês</span>
+                  </>
+                ) : (
+                  <span className="text-[#9E9EA0]">—</span>
+                )}
               </div>
             </div>
 
             <div className="bg-white border border-[#E8E9EA] rounded-xl p-4 shadow-2xs space-y-1">
               <span className="text-xs font-medium text-[#666668] flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-[#3B82F6]" />
-                <span>Faturamento Pontual (Projeto)</span>
+                <span>Valor Pontual Proposto</span>
               </span>
               <div className="text-xl font-bold text-[#1D1D1D]">
-                {formatCurrency(totals.oneTimeTotal)}
+                {proposal.one_time_amount !== null && proposal.one_time_amount !== undefined ? (
+                  formatCurrency(proposal.one_time_amount)
+                ) : (
+                  <span className="text-[#9E9EA0]">—</span>
+                )}
               </div>
-            </div>
-          </div>
-
-          {/* Section: Proposal Items Table */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-[#666668] uppercase tracking-wider flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5" />
-                <span>Itens e Escopo da Proposta ({proposal.items?.length || 0})</span>
-              </h3>
-            </div>
-
-            <div className="bg-white border border-[#E8E9EA] rounded-xl overflow-hidden shadow-2xs">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-[#FAFAFA] border-b border-[#E8E9EA] text-[#666668] uppercase text-[10px] font-semibold tracking-wider">
-                    <th className="py-2.5 px-3.5">Serviço / Descrição</th>
-                    <th className="py-2.5 px-3.5">Cobrança</th>
-                    <th className="py-2.5 px-3.5 text-center">Qtd</th>
-                    <th className="py-2.5 px-3.5 text-right">Preço Unit.</th>
-                    <th className="py-2.5 px-3.5 text-right">Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#E8E9EA]">
-                  {(!proposal.items || proposal.items.length === 0) ? (
-                    <tr>
-                      <td colSpan={5} className="py-6 text-center text-[#9E9EA0]">
-                        Nenhum item adicionado a esta proposta.
-                      </td>
-                    </tr>
-                  ) : (
-                    proposal.items.map((item, idx) => {
-                      const lineTotal = (item.quantity || 0) * (item.unit_price || 0);
-                      return (
-                        <tr key={item.id || idx} className="hover:bg-[#F9F9FA]">
-                          <td className="py-3 px-3.5">
-                            <div className="font-medium text-[#1D1D1D]">
-                              {item.description}
-                            </div>
-                            {item.service_key && (
-                              <div className="text-[10px] text-[#9E9EA0] uppercase tracking-wider font-mono mt-0.5">
-                                {item.service_key}
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-3 px-3.5">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${
-                                item.billing_type === 'monthly'
-                                  ? 'bg-[#FDF1EE] text-[#F15A3C] border-[#FBC3B8]'
-                                  : 'bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]'
-                              }`}
-                            >
-                              {getBillingTypeLabel(item.billing_type)}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3.5 text-center font-mono font-medium text-[#1D1D1D]">
-                            {item.quantity}
-                          </td>
-                          <td className="py-3 px-3.5 text-right text-[#666668]">
-                            {formatCurrency(item.unit_price)}
-                          </td>
-                          <td className="py-3 px-3.5 text-right font-semibold text-[#1D1D1D]">
-                            {formatCurrency(lineTotal)}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
             </div>
           </div>
 
@@ -481,11 +669,11 @@ export const ProposalDetailDrawer: React.FC<ProposalDetailDrawerProps> = ({
                 </div>
               )}
 
-              {/* Termos */}
+              {/* Termos Legados (se existirem para o registro antigo) */}
               {proposal.terms && (
                 <div className="p-3.5 space-y-1">
                   <div className="text-xs text-[#666668] font-medium">
-                    Termos e Condições
+                    Termos e Condições (Legado)
                   </div>
                   <div className="text-xs text-[#1D1D1D] whitespace-pre-wrap leading-relaxed bg-[#F9F9FA] p-3 rounded-lg border border-[#E8E9EA]">
                     {proposal.terms}
@@ -581,24 +769,6 @@ export const ProposalDetailDrawer: React.FC<ProposalDetailDrawerProps> = ({
         onClose={() => setIsContractModalOpen(false)}
         onSubmit={handleCreateContract}
         onSuccess={handleContractCreated}
-      />
-
-      {/* Embedded Proposal Document Editor Modal */}
-      <ProposalDocumentEditor
-        proposal={proposal}
-        isOpen={isDocumentEditorOpen}
-        onClose={() => setIsDocumentEditorOpen(false)}
-      />
-
-      {/* Embedded Proposal Document Preview Modal */}
-      <ProposalDocumentPreviewModal
-        proposal={proposal}
-        isOpen={isPreviewModalOpen}
-        onClose={() => setIsPreviewModalOpen(false)}
-        onOpenEditor={() => {
-          setIsPreviewModalOpen(false);
-          setIsDocumentEditorOpen(true);
-        }}
       />
     </>
   );

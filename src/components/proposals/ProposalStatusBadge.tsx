@@ -2,9 +2,6 @@ import React from 'react';
 import {
   Proposal,
   ProposalStatus,
-  ProposalBillingType,
-  ProposalItem,
-  ProposalTotals,
 } from '../../types/proposals';
 
 interface ProposalStatusBadgeProps {
@@ -78,10 +75,6 @@ export function getStatusLabel(status: ProposalStatus): string {
   return STATUS_CONFIG[status]?.label || status;
 }
 
-export function getBillingTypeLabel(type: ProposalBillingType): string {
-  return type === 'monthly' ? 'Mensal' : 'Pontual';
-}
-
 export function formatCurrency(value?: number | null): string {
   if (value === null || value === undefined || isNaN(value)) {
     return 'R$ 0,00';
@@ -124,26 +117,6 @@ export function formatDateTime(dateString?: string | null): string {
   } catch {
     return '—';
   }
-}
-
-export function calculateProposalTotals(items?: ProposalItem[]): ProposalTotals {
-  if (!items || !Array.isArray(items)) {
-    return { monthlyTotal: 0, oneTimeTotal: 0 };
-  }
-
-  let monthlyTotal = 0;
-  let oneTimeTotal = 0;
-
-  for (const item of items) {
-    const total = (item.quantity || 0) * (item.unit_price || 0);
-    if (item.billing_type === 'monthly') {
-      monthlyTotal += total;
-    } else if (item.billing_type === 'one_time') {
-      oneTimeTotal += total;
-    }
-  }
-
-  return { monthlyTotal, oneTimeTotal };
 }
 
 export function isProposalExpired(proposal: Proposal): boolean {

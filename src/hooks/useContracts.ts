@@ -13,6 +13,8 @@ import {
   transitionContractStatus,
   updateContractOperational,
 } from '../services/contractsService';
+import { convertSignedContractToClient } from '../services/clientsService';
+import { Client } from '../types/clients';
 
 export function useContracts() {
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -169,6 +171,54 @@ export function useContracts() {
     setUpdateError(null);
   }, []);
 
+  const handleConvertToClient = useCallback(
+    async (
+      contractId: string
+    ): Promise<{ success: boolean; client?: Client; error?: string }> => {
+      try {
+        const client = await convertSignedContractToClient(contractId);
+
+        // Update local state: link opportunity to the newly created client
+        setContracts((prev) =>
+          prev.map((c) => {
+            if (c.id === contractId && c.opportunity) {
+              return {
+                ...c,
+                opportunity: {
+                  ...c.opportunity,
+                  client_id: client.id,
+                },
+              };
+            }
+            return c;
+          })
+        );
+
+        setSelectedContract((curr) => {
+          if (curr && curr.id === contractId && curr.opportunity) {
+            return {
+              ...curr,
+              opportunity: {
+                ...curr.opportunity,
+                client_id: client.id,
+              },
+            };
+          }
+          return curr;
+        });
+
+        return { success: true, client };
+      } catch (err: unknown) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : 'Erro ao converter contrato em cliente.';
+        return { success: false, error: msg };
+      }
+    },
+    []
+  );
+
   return {
     contracts: filteredContracts,
     allContracts: contracts,
@@ -188,6 +238,7 @@ export function useContracts() {
     handleCreateContract,
     handleTransitionStatus,
     handleUpdateContract,
+    handleConvertToClient,
     handleSelectContract,
   };
 }
