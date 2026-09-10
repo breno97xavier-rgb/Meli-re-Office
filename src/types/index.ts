@@ -19,7 +19,9 @@ export type RoutePath =
   | '/tarefas'
   | '/financeiro'
   | '/inbox'
-  | '/configuracoes';
+  | '/configuracoes'
+  | `/clientes/${string}`
+  | `/apresentacoes/${string}`;
 
 export type UserRole = 'admin' | 'team' | 'client';
 
@@ -66,3 +68,7 @@ export * from './opportunities';
 export * from './proposals';
 export * from './contracts';
 export * from './clients';
+export * from './contacts';
+export * from './contents';
+export * from './contentAssets';
+export * from './presentations';

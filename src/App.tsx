@@ -9,6 +9,10 @@ import { OpportunitiesPage } from '@/src/pages/OpportunitiesPage';
 import { ProposalsPage } from '@/src/pages/ProposalsPage';
 import { ContractsPage } from '@/src/pages/ContractsPage';
 import { ClientsPage } from '@/src/pages/ClientsPage';
+import { ClientProfilePage } from '@/src/pages/ClientProfilePage';
+import { ContentsPage } from '@/src/pages/ContentsPage';
+import { PresentationsPage } from '@/src/pages/PresentationsPage';
+import { PresentationEditorPage } from '@/src/pages/PresentationEditorPage';
 import { PlaceholderModulePage } from '@/src/pages/PlaceholderModulePage';
 import { LoginPage } from '@/src/pages/LoginPage';
 import { LoadingGate } from '@/src/components/auth/LoadingGate';
@@ -57,8 +61,24 @@ function AppContent() {
       case '/comercial/contratos':
         return <ContractsPage />;
       case '/clientes':
-        return <ClientsPage />;
+        return <ClientsPage onNavigate={navigate} />;
+      case '/conteudos':
+        return <ContentsPage />;
+      case '/apresentacoes':
+        return <PresentationsPage />;
       default:
+        if (currentPath.startsWith('/apresentacoes/')) {
+          const presentationId = currentPath.replace('/apresentacoes/', '').split('/')[0];
+          if (presentationId) {
+            return <PresentationEditorPage presentationId={presentationId} />;
+          }
+        }
+        if (currentPath.startsWith('/clientes/')) {
+          const clientId = currentPath.replace('/clientes/', '').split('/')[0];
+          if (clientId) {
+            return <ClientProfilePage clientId={clientId} onNavigate={navigate} />;
+          }
+        }
         return <PlaceholderModulePage path={currentPath} />;
     }
   };

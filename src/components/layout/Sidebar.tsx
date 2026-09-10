@@ -109,7 +109,10 @@ export function Sidebar({
                     const isActive =
                       currentPath === item.path ||
                       (item.path === '/dashboard' && currentPath === '/') ||
-                      (item.path === '/comercial' && currentPath.startsWith('/comercial'));
+                      (item.path === '/comercial' && currentPath.startsWith('/comercial')) ||
+                      (item.path === '/clientes' && currentPath.startsWith('/clientes')) ||
+                      (item.path === '/conteudos' && currentPath.startsWith('/conteudos')) ||
+                      (item.path === '/apresentacoes' && currentPath.startsWith('/apresentacoes'));
 
                     return (
                       <div key={item.id} className="relative">

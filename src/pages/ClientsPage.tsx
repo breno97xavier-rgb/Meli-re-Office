@@ -5,7 +5,11 @@ import { ClientsTable } from '../components/clients/ClientsTable';
 import { ClientDetailDrawer } from '../components/clients/ClientDetailDrawer';
 import { useClients } from '../hooks/useClients';
 
-export const ClientsPage: React.FC = () => {
+interface ClientsPageProps {
+  onNavigate?: (path: string) => void;
+}
+
+export const ClientsPage: React.FC<ClientsPageProps> = ({ onNavigate }) => {
   const {
     clients,
     allClients,
@@ -23,6 +27,14 @@ export const ClientsPage: React.FC = () => {
     handleSelectClient,
     handleUpdateClient,
   } = useClients();
+
+  const handleClientClick = (client: any) => {
+    if (onNavigate) {
+      onNavigate(`/clientes/${client.id}`);
+    } else {
+      handleSelectClient(client);
+    }
+  };
 
   return (
     <div id="clients-page" className="p-6 md:p-8 space-y-6">
@@ -62,7 +74,7 @@ export const ClientsPage: React.FC = () => {
         onSelectStatusFilter={setStatusFilter}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
-        onSelectClient={handleSelectClient}
+        onSelectClient={handleClientClick}
       />
 
       {/* Client Detail / Basic Management Drawer */}

@@ -31,6 +31,12 @@ export function Topbar({ currentPath, onOpenMobileMenu, isCollapsed: _isCollapse
     if (currentPath === '/comercial/leads' || currentPath === '/comercial') {
       return { label: 'Leads', group: 'Comercial' };
     }
+    if (currentPath.startsWith('/apresentacoes/')) {
+      return { label: 'Editor de Apresentação', group: 'Operação' };
+    }
+    if (currentPath.startsWith('/clientes/')) {
+      return { label: 'Perfil do Cliente', group: 'Comercial' };
+    }
     return (
       NAVIGATION_ITEMS.find((item) => item.path === currentPath) || {
         label: 'Dashboard',

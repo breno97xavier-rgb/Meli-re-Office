@@ -201,3 +201,262 @@ export async function convertSignedContractToClient(
 
   return data as Client;
 }
+
+export async function fetchClientById(clientId: string): Promise<Client | null> {
+  if (!clientId) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('clients')
+      .select(`
+        id,
+        name,
+        commercial_name,
+        slug,
+        status,
+        logo_url,
+        segment,
+        website,
+        instagram,
+        phone,
+        email,
+        notes,
+        contract_start_date,
+        contract_end_date,
+        monthly_amount,
+        one_time_amount,
+        origin_contract_id,
+        origin_opportunity_id,
+        created_at,
+        updated_at,
+        origin_contract:contracts!clients_origin_contract_id_fkey(
+          id,
+          contract_number,
+          title,
+          version,
+          status,
+          start_date,
+          end_date,
+          monthly_amount,
+          one_time_amount,
+          signed_at
+        ),
+        origin_opportunity:opportunities!clients_origin_opportunity_id_fkey(
+          id,
+          title,
+          stage,
+          estimated_value,
+          services_of_interest,
+          probability,
+          closed_at
+        )
+      `)
+      .eq('id', clientId)
+      .maybeSingle();
+
+    if (!error && data) {
+      return normalizeClient(data);
+    }
+    if (error) {
+      console.warn('Query with relations failed for client, falling back:', error);
+    }
+  } catch (err) {
+    console.warn('Fallback error fetching single client with relations:', err);
+  }
+
+  const { data: rawData, error: rawError } = await supabase
+    .from('clients')
+    .select('*')
+    .eq('id', clientId)
+    .maybeSingle();
+
+  if (rawError) {
+    console.error('Error fetching client by ID:', rawError);
+    throw new Error(rawError.message || 'Erro ao carregar dados do cliente.');
+  }
+
+  return rawData ? (rawData as Client) : null;
+}
+
+export async function fetchClientCommercialHistory(
+  clientId: string,
+  client?: Client | null
+) {
+  if (!clientId) {
+    return {
+      opportunities: [],
+      proposals: [],
+      contracts: [],
+    };
+  }
+
+  try {
+    // 1. Busca oportunidades vinculadas ao client_id
+    const { data: oppsData, error: oppsError } = await supabase
+      .from('opportunities')
+      .select(`
+        id,
+        title,
+        stage,
+        services_of_interest,
+        probability,
+        estimated_value,
+        closed_at,
+        created_at
+      `)
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false });
+
+    if (oppsError) {
+      console.warn('Error fetching client opportunities:', oppsError);
+    }
+
+    const opportunities = (oppsData || []) as Array<{
+      id: string;
+      title: string;
+      stage: string;
+      services_of_interest?: string[] | null;
+      probability?: number | null;
+      estimated_value?: number | null;
+      closed_at?: string | null;
+      created_at: string;
+    }>;
+
+    // Se houver origin_opportunity_id e não estiver na lista, adiciona
+    if (client?.origin_opportunity_id && !opportunities.some(o => o.id === client.origin_opportunity_id)) {
+      const { data: originOpp } = await supabase
+        .from('opportunities')
+        .select(`
+          id,
+          title,
+          stage,
+          services_of_interest,
+          probability,
+          estimated_value,
+          closed_at,
+          created_at
+        `)
+        .eq('id', client.origin_opportunity_id)
+        .maybeSingle();
+
+      if (originOpp) {
+        opportunities.unshift(originOpp);
+      }
+    }
+
+    const opportunityIds = opportunities.map((o) => o.id).filter(Boolean);
+
+    // 2. Busca propostas vinculadas a essas oportunidades
+    let proposals: Array<{
+      id: string;
+      opportunity_id: string;
+      title: string;
+      version: number;
+      status: string;
+      valid_until?: string | null;
+      monthly_amount?: number | null;
+      one_time_amount?: number | null;
+      accepted_at?: string | null;
+      rejected_at?: string | null;
+      sent_at?: string | null;
+      created_at: string;
+      notes?: string | null;
+    }> = [];
+
+    if (opportunityIds.length > 0) {
+      const { data: propsData, error: propsError } = await supabase
+        .from('proposals')
+        .select(`
+          id,
+          opportunity_id,
+          title,
+          version,
+          status,
+          valid_until,
+          monthly_amount,
+          one_time_amount,
+          accepted_at,
+          rejected_at,
+          sent_at,
+          created_at,
+          notes
+        `)
+        .in('opportunity_id', opportunityIds)
+        .order('created_at', { ascending: false });
+
+      if (propsError) {
+        console.warn('Error fetching proposals for client opportunities:', propsError);
+      } else if (propsData) {
+        proposals = propsData;
+      }
+    }
+
+    // 3. Busca contratos vinculados às oportunidades ou ao origin_contract_id
+    let contracts: Array<{
+      id: string;
+      proposal_id?: string | null;
+      opportunity_id?: string | null;
+      contract_number: string;
+      title: string;
+      version: number;
+      status: string;
+      start_date?: string | null;
+      end_date?: string | null;
+      monthly_amount?: number | null;
+      one_time_amount?: number | null;
+      signed_at?: string | null;
+      created_at: string;
+      notes?: string | null;
+    }> = [];
+
+    const contractIdsToInclude = client?.origin_contract_id ? [client.origin_contract_id] : [];
+
+    if (opportunityIds.length > 0 || contractIdsToInclude.length > 0) {
+      let query = supabase.from('contracts').select(`
+        id,
+        proposal_id,
+        opportunity_id,
+        contract_number,
+        title,
+        version,
+        status,
+        start_date,
+        end_date,
+        monthly_amount,
+        one_time_amount,
+        signed_at,
+        created_at,
+        notes
+      `);
+
+      if (opportunityIds.length > 0 && contractIdsToInclude.length > 0) {
+        query = query.or(`opportunity_id.in.(${opportunityIds.join(',')}),id.in.(${contractIdsToInclude.join(',')})`);
+      } else if (opportunityIds.length > 0) {
+        query = query.in('opportunity_id', opportunityIds);
+      } else {
+        query = query.in('id', contractIdsToInclude);
+      }
+
+      const { data: contractsData, error: contractsError } = await query.order('created_at', { ascending: false });
+
+      if (contractsError) {
+        console.warn('Error fetching contracts for client:', contractsError);
+      } else if (contractsData) {
+        contracts = contractsData;
+      }
+    }
+
+    return {
+      opportunities,
+      proposals,
+      contracts,
+    };
+  } catch (err) {
+    console.error('Error fetching client commercial history:', err);
+    return {
+      opportunities: [],
+      proposals: [],
+      contracts: [],
+    };
+  }
+}

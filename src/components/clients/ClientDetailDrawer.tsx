@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Building2,
@@ -14,6 +14,8 @@ import {
   Check,
   FileText,
   Clock,
+  AlertTriangle,
+  Save,
 } from 'lucide-react';
 import { Client, ClientStatus, UpdateClientInput } from '../../types/clients';
 import {
@@ -56,7 +58,7 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
   });
 
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   // Sync form state when active client changes
   useEffect(() => {
@@ -74,10 +76,40 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
         contract_start_date: client.contract_start_date || '',
         contract_end_date: client.contract_end_date || '',
       });
-      setHasChanges(false);
       setSaveSuccess(false);
+      setShowDiscardConfirm(false);
     }
   }, [client]);
+
+  // Dirty state calculation
+  const isDirty = useMemo(() => {
+    if (!client) return false;
+    const origName = (client.name || '').trim();
+    const origCommercial = (client.commercial_name || '').trim();
+    const origSegment = (client.segment || '').trim();
+    const origWebsite = (client.website || '').trim();
+    const origInstagram = (client.instagram || '').trim();
+    const origPhone = (client.phone || '').trim();
+    const origEmail = (client.email || '').trim();
+    const origNotes = (client.notes || '').trim();
+    const origStatus = client.status || 'onboarding';
+    const origStartDate = client.contract_start_date || '';
+    const origEndDate = client.contract_end_date || '';
+
+    return (
+      (formData.name || '').trim() !== origName ||
+      (formData.commercial_name || '').trim() !== origCommercial ||
+      (formData.segment || '').trim() !== origSegment ||
+      (formData.website || '').trim() !== origWebsite ||
+      (formData.instagram || '').trim() !== origInstagram ||
+      (formData.phone || '').trim() !== origPhone ||
+      (formData.email || '').trim() !== origEmail ||
+      (formData.notes || '').trim() !== origNotes ||
+      formData.status !== origStatus ||
+      (formData.contract_start_date || '') !== origStartDate ||
+      (formData.contract_end_date || '') !== origEndDate
+    );
+  }, [client, formData]);
 
   if (!isOpen || !client) return null;
 
@@ -89,20 +121,35 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
       ...prev,
       [field]: value,
     }));
-    setHasChanges(true);
     setSaveSuccess(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!client) return;
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!client || !isDirty || isUpdating) return;
 
     const success = await onUpdateClient(client.id, formData);
     if (success) {
       setSaveSuccess(true);
-      setHasChanges(false);
       setTimeout(() => setSaveSuccess(false), 3000);
     }
+  };
+
+  const handleAttemptClose = () => {
+    if (isDirty) {
+      setShowDiscardConfirm(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false);
+    onClose();
+  };
+
+  const handleContinueEditing = () => {
+    setShowDiscardConfirm(false);
   };
 
   const getClientInitials = () => {
@@ -119,7 +166,7 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-[#1D1D1D]/30 backdrop-blur-xs transition-opacity"
-        onClick={onClose}
+        onClick={handleAttemptClose}
       />
 
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
@@ -143,13 +190,13 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
               <div className="min-w-0 space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-lg font-bold text-[#1D1D1D] truncate tracking-tight">
-                    {client.commercial_name || client.name}
+                    {formData.commercial_name || formData.name || 'Sem nome'}
                   </h2>
-                  <ClientStatusBadge status={client.status} />
+                  <ClientStatusBadge status={formData.status || 'onboarding'} />
                 </div>
-                {client.commercial_name && client.commercial_name !== client.name && (
+                {formData.commercial_name && formData.name && formData.commercial_name !== formData.name && (
                   <p className="text-xs text-[#666668] truncate">
-                    {client.name}
+                    {formData.name}
                   </p>
                 )}
               </div>
@@ -157,7 +204,8 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
 
             <button
               id="btn-close-client-drawer"
-              onClick={onClose}
+              type="button"
+              onClick={handleAttemptClose}
               className="p-2 text-[#666668] hover:text-[#1D1D1D] hover:bg-[#F7F7F8] rounded-lg transition-colors cursor-pointer shrink-0"
               title="Fechar painel"
             >
@@ -166,6 +214,13 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
           </div>
 
           {/* Feedback Banners */}
+          {saveSuccess && (
+            <div className="mx-6 mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2.5 text-xs text-emerald-800 font-semibold animate-in fade-in">
+              <Check className="w-4 h-4 text-emerald-600" />
+              <span>Alterações salvas com sucesso!</span>
+            </div>
+          )}
+
           {updateError && (
             <div className="mx-6 mt-4 p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-2.5 shadow-2xs">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -528,11 +583,11 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
           </form>
 
           {/* Footer Actions */}
-          <div className="p-4 border-t border-[#E8E9EA] bg-[#FAFAFA] flex items-center justify-between gap-3">
+          <div className="p-4 border-t border-[#E8E9EA] bg-[#FAFAFA] flex items-center justify-between gap-3 shrink-0">
             <button
               type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-[#666668] bg-white border border-[#E8E9EA] rounded-lg hover:bg-[#F2F3F3] hover:text-[#1D1D1D] transition-all cursor-pointer shadow-2xs"
+              onClick={handleAttemptClose}
+              className="px-4 py-2 text-xs font-semibold text-[#666668] hover:text-[#1D1D1D] bg-[#F2F3F3] hover:bg-[#EDEEEE] rounded-lg transition-colors cursor-pointer"
             >
               Fechar
             </button>
@@ -540,9 +595,9 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
             <button
               type="button"
               id="btn-save-client-drawer"
-              onClick={handleSubmit}
-              disabled={isUpdating || !hasChanges}
-              className="inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-[#1D1D1D] hover:bg-black rounded-lg transition-all cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={() => handleSubmit()}
+              disabled={isUpdating || !isDirty || !(formData.commercial_name || formData.name)?.trim()}
+              className="inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-[#1D1D1D] hover:bg-black rounded-lg transition-all cursor-pointer shadow-2xs active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {isUpdating ? (
                 <>
@@ -551,7 +606,7 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
                 </>
               ) : (
                 <>
-                  <Check className="w-3.5 h-3.5" />
+                  <Save className="w-3.5 h-3.5" />
                   <span>Salvar Alterações</span>
                 </>
               )}
@@ -559,6 +614,44 @@ export const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Discard Confirmation Modal */}
+      {showDiscardConfirm && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-100">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-[#E8E9EA] space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-amber-600">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-[#1D1D1D]">
+                  Descartar alterações?
+                </h3>
+                <p className="text-xs text-[#666668] mt-0.5">
+                  Existem alterações que ainda não foram salvas.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={handleContinueEditing}
+                className="px-3.5 py-2 text-xs font-semibold text-[#1D1D1D] bg-white border border-[#E8E9EA] rounded-lg hover:bg-[#F7F7F8] transition-colors cursor-pointer"
+              >
+                Continuar editando
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDiscard}
+                className="px-3.5 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors cursor-pointer shadow-xs"
+              >
+                Descartar alterações
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

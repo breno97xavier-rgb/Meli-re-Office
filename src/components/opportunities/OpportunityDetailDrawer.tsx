@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Building2,
@@ -16,6 +16,8 @@ import {
   DollarSign,
   Sparkles,
   FileText,
+  AlertTriangle,
+  Save,
 } from 'lucide-react';
 import {
   Opportunity,
@@ -76,8 +78,8 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
   const [expectedCloseDate, setExpectedCloseDate] = useState('');
   const [lostReason, setLostReason] = useState('');
   const [showLostPrompt, setShowLostPrompt] = useState(false);
-  const [pendingLostStage, setPendingLostStage] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   useEffect(() => {
     if (opportunity && isOpen) {
@@ -101,10 +103,57 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
       setExpectedCloseDate(opportunity.expected_close_date || '');
       setLostReason(opportunity.lost_reason || '');
       setShowLostPrompt(opportunity.stage === 'lost');
-      setPendingLostStage(false);
       setSaveSuccess(false);
+      setShowDiscardConfirm(false);
     }
   }, [opportunity, isOpen]);
+
+  // Dirty state tracking
+  const isDirty = useMemo(() => {
+    if (!opportunity) return false;
+    const origTitle = (opportunity.title || '').trim();
+    const origStage = opportunity.stage;
+    const origEstimatedValue =
+      opportunity.estimated_value !== null && opportunity.estimated_value !== undefined
+        ? String(opportunity.estimated_value)
+        : '';
+    const origProbability =
+      opportunity.probability !== null && opportunity.probability !== undefined
+        ? String(opportunity.probability)
+        : '50';
+    const origServices = opportunity.services_of_interest || [];
+    const origNextAction = (opportunity.next_action || '').trim();
+    const origNextActionDate = opportunity.next_action_date || '';
+    const origExpectedCloseDate = opportunity.expected_close_date || '';
+    const origLostReason = (opportunity.lost_reason || '').trim();
+
+    const servicesChanged =
+      selectedServices.length !== origServices.length ||
+      selectedServices.some((s) => !origServices.includes(s));
+
+    return (
+      title.trim() !== origTitle ||
+      stage !== origStage ||
+      estimatedValue.trim() !== origEstimatedValue.trim() ||
+      probability !== origProbability ||
+      servicesChanged ||
+      nextAction.trim() !== origNextAction ||
+      nextActionDate !== origNextActionDate ||
+      expectedCloseDate !== origExpectedCloseDate ||
+      (stage === 'lost' && lostReason.trim() !== origLostReason)
+    );
+  }, [
+    opportunity,
+    title,
+    stage,
+    estimatedValue,
+    probability,
+    selectedServices,
+    nextAction,
+    nextActionDate,
+    expectedCloseDate,
+    lostReason,
+  ]);
 
   if (!isOpen || !opportunity) return null;
 
@@ -114,29 +163,19 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
     );
   };
 
-  const handleStageChange = async (newStage: OpportunityStage) => {
+  // Draft update only - no immediate remote persistence
+  const handleStageChange = (newStage: OpportunityStage) => {
     setStage(newStage);
     if (newStage === 'lost') {
       setShowLostPrompt(true);
-      setPendingLostStage(true);
     } else {
       setShowLostPrompt(false);
-      setPendingLostStage(false);
-      // Immediately trigger stage update for fast pipeline change
-      const updates: UpdateOpportunityInput = {
-        stage: newStage,
-      };
-      const ok = await onUpdate(opportunity.id, updates);
-      if (ok) {
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 2500);
-      }
     }
   };
 
-  const handleSaveFullDetails = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
+  const handleSaveFullDetails = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!title.trim() || isUpdating || !isDirty) return;
 
     let parsedVal: number | null = null;
     if (estimatedValue.trim()) {
@@ -169,10 +208,26 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
 
     const ok = await onUpdate(opportunity.id, updates);
     if (ok) {
-      setPendingLostStage(false);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     }
+  };
+
+  const handleAttemptClose = () => {
+    if (isDirty) {
+      setShowDiscardConfirm(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false);
+    onClose();
+  };
+
+  const handleContinueEditing = () => {
+    setShowDiscardConfirm(false);
   };
 
   return (
@@ -180,7 +235,7 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-[#1D1D1D]/40 backdrop-blur-xs z-40 transition-opacity"
-        onClick={onClose}
+        onClick={handleAttemptClose}
       />
 
       {/* Drawer */}
@@ -195,7 +250,7 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
               <h2 className="text-xl font-semibold text-[#1D1D1D] truncate max-w-sm">
                 {opportunity.title}
               </h2>
-              <OpportunityStageBadge stage={opportunity.stage} size="md" />
+              <OpportunityStageBadge stage={stage} size="md" />
             </div>
             {opportunity.lead && (
               <p className="text-sm font-medium text-[#666668] mt-1 flex items-center gap-1.5">
@@ -213,7 +268,7 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
 
           <button
             id="btn-close-opp-drawer"
-            onClick={onClose}
+            onClick={handleAttemptClose}
             className="p-1.5 text-[#666668] hover:text-[#1D1D1D] hover:bg-[#E8E9EA]/60 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -222,7 +277,23 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Quick Stage Alteration Control */}
+          {/* Success Banner */}
+          {saveSuccess && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2.5 text-xs text-emerald-800 font-semibold animate-in fade-in">
+              <Check className="w-4 h-4 text-emerald-600" />
+              <span>Alterações salvas com sucesso!</span>
+            </div>
+          )}
+
+          {/* Error Alert */}
+          {updateError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5 text-xs text-red-700">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
+              <span>{updateError}</span>
+            </div>
+          )}
+
+          {/* Stage Alteration Control (Draft mode) */}
           <div className="bg-[#F7F7F8] border border-[#E8E9EA] rounded-xl p-4.5 space-y-3">
             <div className="flex items-center justify-between">
               <label
@@ -231,18 +302,6 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
               >
                 Estágio do Pipeline
               </label>
-              {isUpdating && (
-                <div className="flex items-center gap-1.5 text-xs text-[#F15A3C] font-medium">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Atualizando...</span>
-                </div>
-              )}
-              {saveSuccess && (
-                <div className="flex items-center gap-1.5 text-xs text-[#059669] font-medium">
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Salvo com sucesso</span>
-                </div>
-              )}
             </div>
 
             <div className="relative">
@@ -277,13 +336,6 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
                   placeholder="Ex: Orçamento fora do escopo, adiou projeto..."
                   className="w-full bg-[#F7F7F8] border border-[#D1D2D4] rounded-md px-3 py-1.5 text-xs text-[#1D1D1D] placeholder:text-[#9E9EA0] focus:outline-none focus:border-[#F15A3C]"
                 />
-              </div>
-            )}
-
-            {updateError && (
-              <div className="flex items-center gap-2 p-2.5 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{updateError}</span>
               </div>
             )}
 
@@ -425,25 +477,6 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
                   className="w-full bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg px-3 py-2 text-sm text-[#1D1D1D] focus:bg-white focus:outline-none focus:border-[#F15A3C]"
                 />
               </div>
-
-              {/* Save button */}
-              <div className="pt-3 border-t border-[#E8E9EA] flex justify-end">
-                <button
-                  type="submit"
-                  id="btn-save-opportunity-details"
-                  disabled={isUpdating}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-[#F15A3C] hover:bg-[#d94a2e] rounded-lg transition-all shadow-2xs disabled:opacity-60 cursor-pointer"
-                >
-                  {isUpdating ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Salvando...</span>
-                    </>
-                  ) : (
-                    <span>Salvar Alterações</span>
-                  )}
-                </button>
-              </div>
             </div>
           </form>
 
@@ -567,16 +600,76 @@ export const OpportunityDetailDrawer: React.FC<OpportunityDetailDrawerProps> = (
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-[#E8E9EA] bg-[#FAFAFA] flex justify-end">
+        <div className="p-4 border-t border-[#E8E9EA] bg-[#FAFAFA] flex items-center justify-between gap-3 shrink-0">
           <button
             id="btn-close-opp-drawer-bottom"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-[#1D1D1D] bg-white border border-[#E8E9EA] rounded-lg hover:bg-[#F7F7F8] hover:border-[#D1D2D4] transition-all cursor-pointer"
+            type="button"
+            onClick={handleAttemptClose}
+            className="px-4 py-2 text-xs font-semibold text-[#666668] hover:text-[#1D1D1D] bg-[#F2F3F3] hover:bg-[#EDEEEE] rounded-lg transition-colors cursor-pointer"
           >
-            Fechar Detalhes
+            Fechar
+          </button>
+
+          <button
+            type="button"
+            id="btn-save-opportunity-details"
+            onClick={() => handleSaveFullDetails()}
+            disabled={isUpdating || !isDirty || !title.trim()}
+            className="inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-[#1D1D1D] hover:bg-black rounded-lg transition-all cursor-pointer shadow-2xs active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {isUpdating ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Salvando...</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-3.5 h-3.5" />
+                <span>Salvar Alterações</span>
+              </>
+            )}
           </button>
         </div>
       </div>
+
+      {/* Discard Confirmation Modal */}
+      {showDiscardConfirm && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-100">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-[#E8E9EA] space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-amber-600">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-[#1D1D1D]">
+                  Descartar alterações?
+                </h3>
+                <p className="text-xs text-[#666668] mt-0.5">
+                  Existem alterações que ainda não foram salvas.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={handleContinueEditing}
+                className="px-3.5 py-2 text-xs font-semibold text-[#1D1D1D] bg-white border border-[#E8E9EA] rounded-lg hover:bg-[#F7F7F8] transition-colors cursor-pointer"
+              >
+                Continuar editando
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDiscard}
+                className="px-3.5 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors cursor-pointer shadow-xs"
+              >
+                Descartar alterações
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
+

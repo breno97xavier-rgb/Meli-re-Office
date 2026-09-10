@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   User,
@@ -100,6 +100,7 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
   const [renewalPeriodMonths, setRenewalPeriodMonths] = useState<number | ''>(12);
   const [cancellationNoticeDays, setCancellationNoticeDays] = useState<number | ''>(30);
   const [notes, setNotes] = useState('');
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   // Status transition modal with reason
   const [reasonModal, setReasonModal] = useState<{
@@ -164,6 +165,7 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
       setCancellationNoticeDays(contract.cancellation_notice_days ?? 30);
       setNotes(contract.notes || '');
       setIsEditing(false);
+      setShowDiscardConfirm(false);
       setReasonModal({ isOpen: false, targetStatus: 'cancelled', reason: '' });
       setReasonError(null);
       setShowConvertModal(false);
@@ -172,6 +174,50 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
       setIsHistoryOpen(false);
     }
   }, [contract?.id, isOpen]);
+
+  // Dirty state calculation for edit mode
+  const isDirty = useMemo(() => {
+    if (!contract || !isEditing) return false;
+    const origTitle = (contract.title || '').trim();
+    const origMonthly =
+      contract.monthly_amount !== null && contract.monthly_amount !== undefined
+        ? contract.monthly_amount
+        : '';
+    const origOneTime =
+      contract.one_time_amount !== null && contract.one_time_amount !== undefined
+        ? contract.one_time_amount
+        : '';
+    const origStartDate = contract.start_date || '';
+    const origEndDate = contract.end_date || '';
+    const origAutoRenewal = Boolean(contract.auto_renewal);
+    const origRenewalMonths = contract.renewal_period_months ?? 12;
+    const origNoticeDays = contract.cancellation_notice_days ?? 30;
+    const origNotes = (contract.notes || '').trim();
+
+    return (
+      title.trim() !== origTitle ||
+      monthlyAmount !== origMonthly ||
+      oneTimeAmount !== origOneTime ||
+      startDate !== origStartDate ||
+      endDate !== origEndDate ||
+      autoRenewal !== origAutoRenewal ||
+      renewalPeriodMonths !== origRenewalMonths ||
+      cancellationNoticeDays !== origNoticeDays ||
+      notes.trim() !== origNotes
+    );
+  }, [
+    contract,
+    isEditing,
+    title,
+    monthlyAmount,
+    oneTimeAmount,
+    startDate,
+    endDate,
+    autoRenewal,
+    renewalPeriodMonths,
+    cancellationNoticeDays,
+    notes,
+  ]);
 
   if (!isOpen || !contract) return null;
 
@@ -183,6 +229,51 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
   const isLinkedToClient = Boolean(contract.opportunity?.client_id);
   const expiringSoon = isContractExpiringSoon(contract);
   const expired = isContractExpired(contract);
+
+  const handleAttemptClose = () => {
+    if (isEditing && isDirty) {
+      setShowDiscardConfirm(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false);
+    if (contract) {
+      setTitle(contract.title || '');
+      setMonthlyAmount(
+        contract.monthly_amount !== null && contract.monthly_amount !== undefined
+          ? contract.monthly_amount
+          : ''
+      );
+      setOneTimeAmount(
+        contract.one_time_amount !== null && contract.one_time_amount !== undefined
+          ? contract.one_time_amount
+          : ''
+      );
+      setStartDate(contract.start_date || '');
+      setEndDate(contract.end_date || '');
+      setAutoRenewal(Boolean(contract.auto_renewal));
+      setRenewalPeriodMonths(contract.renewal_period_months ?? 12);
+      setCancellationNoticeDays(contract.cancellation_notice_days ?? 30);
+      setNotes(contract.notes || '');
+    }
+    setIsEditing(false);
+    onClose();
+  };
+
+  const handleAttemptCancelEdit = () => {
+    if (isDirty) {
+      setShowDiscardConfirm(true);
+    } else {
+      setIsEditing(false);
+    }
+  };
+
+  const handleContinueEditing = () => {
+    setShowDiscardConfirm(false);
+  };
 
   const handleConfirmConvertToClient = async () => {
     if (isConverting) return;
@@ -326,7 +417,7 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-[#1D1D1D]/40 backdrop-blur-xs z-40 transition-opacity"
-        onClick={onClose}
+        onClick={handleAttemptClose}
       />
 
       {/* Drawer Container */}
@@ -392,7 +483,8 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
             )}
             <button
               id="btn-close-contract-drawer"
-              onClick={onClose}
+              type="button"
+              onClick={handleAttemptClose}
               className="p-1.5 text-[#666668] hover:text-[#1D1D1D] hover:bg-[#E8E9EA]/60 rounded-lg transition-colors cursor-pointer shrink-0"
             >
               <X className="w-5 h-5" />
@@ -874,17 +966,18 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E8E9EA]">
                 <button
                   type="button"
-                  onClick={() => setIsEditing(false)}
+                  onClick={handleAttemptCancelEdit}
                   disabled={isUpdating}
-                  className="px-3 py-1.5 text-xs font-medium text-[#666668] bg-white border border-[#E8E9EA] rounded-lg hover:bg-[#F2F3F3]"
+                  className="px-3 py-1.5 text-xs font-medium text-[#666668] bg-white border border-[#E8E9EA] rounded-lg hover:bg-[#F2F3F3] cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="button"
+                  id="btn-save-contract-edit"
                   onClick={handleSaveEdit}
-                  disabled={isUpdating}
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-[#F15A3C] hover:bg-[#d94a2e] rounded-lg transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+                  disabled={isUpdating || !isDirty || !title.trim()}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-[#F15A3C] hover:bg-[#d94a2e] rounded-lg transition-colors cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isUpdating ? (
                     <>
@@ -1206,13 +1299,52 @@ export const ContractDetailDrawer: React.FC<ContractDetailDrawerProps> = ({
         <div className="p-4 border-t border-[#E8E9EA] bg-[#FAFAFA] flex justify-end">
           <button
             id="btn-close-contract-drawer-bottom"
-            onClick={onClose}
+            type="button"
+            onClick={handleAttemptClose}
             className="px-4 py-2 text-sm font-medium text-[#1D1D1D] bg-white border border-[#E8E9EA] rounded-lg hover:bg-[#F7F7F8] hover:border-[#D1D2D4] transition-all cursor-pointer shadow-2xs"
           >
             Fechar Detalhes
           </button>
         </div>
       </div>
+
+      {/* Discard Confirmation Modal */}
+      {showDiscardConfirm && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-100">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-[#E8E9EA] space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-amber-600">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-[#1D1D1D]">
+                  Descartar alterações?
+                </h3>
+                <p className="text-xs text-[#666668] mt-0.5">
+                  Existem alterações no contrato que ainda não foram salvas.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={handleContinueEditing}
+                className="px-3.5 py-2 text-xs font-semibold text-[#1D1D1D] bg-white border border-[#E8E9EA] rounded-lg hover:bg-[#F7F7F8] transition-colors cursor-pointer"
+              >
+                Continuar editando
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDiscard}
+                className="px-3.5 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors cursor-pointer shadow-xs"
+              >
+                Descartar alterações
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Status Reason Confirmation Modal (Cancelled / Terminated) */}
       {reasonModal.isOpen && (
