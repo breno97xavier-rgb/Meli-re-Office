@@ -126,7 +126,6 @@ export function useContents(options?: UseContentsOptions) {
         const pillarMatch = content.pillar?.toLowerCase().includes(query);
         const copyMatch = content.copy?.toLowerCase().includes(query);
         const captionMatch = content.caption?.toLowerCase().includes(query);
-        const scriptMatch = content.script?.toLowerCase().includes(query);
         const notesMatch = content.notes?.toLowerCase().includes(query);
         const clientNameMatch =
           content.client?.commercial_name?.toLowerCase().includes(query) ||
@@ -138,7 +137,6 @@ export function useContents(options?: UseContentsOptions) {
           !pillarMatch &&
           !copyMatch &&
           !captionMatch &&
-          !scriptMatch &&
           !notesMatch &&
           !clientNameMatch
         ) {

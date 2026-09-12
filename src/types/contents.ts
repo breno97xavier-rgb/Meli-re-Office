@@ -4,6 +4,19 @@ export type ContentFormat =
   | 'reels'
   | 'story';
 
+export const FORMAT_LABELS: Record<string, string> = {
+  feed_single: 'Post Estático',
+  carousel: 'Carrossel',
+  reels: 'Reels',
+  story: 'Story',
+};
+
+export function getFormatLabel(format?: string | null): string {
+  if (!format) return '';
+  const key = format.toLowerCase().trim();
+  return FORMAT_LABELS[key] || format;
+}
+
 export type EditorialStatus =
   | 'draft'
   | 'in_production'
@@ -49,6 +62,8 @@ export const PRIMARY_CHANNEL_LABELS: Record<string, string> = {
   whatsapp: 'WhatsApp',
   other: 'Outro',
 };
+
+export const CHANNEL_LABELS = PRIMARY_CHANNEL_LABELS;
 
 export function getPrimaryChannelLabel(channel?: string | null): string {
   if (!channel) return '';

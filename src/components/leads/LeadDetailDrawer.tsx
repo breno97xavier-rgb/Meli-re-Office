@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Building2,
+  User,
   Phone,
   Mail,
   FileText,
@@ -14,16 +15,33 @@ import {
   AlertTriangle,
   Save,
   Check,
+  ExternalLink,
+  Target,
+  Compass,
+  MessageSquare,
+  PhoneCall,
+  Sparkles,
+  Navigation,
+  Share2,
 } from 'lucide-react';
 import { Lead, LeadStatus } from '../../types/leads';
+import { LeadStatusBadge } from './LeadStatusBadge';
 import {
-  LeadStatusBadge,
   getStatusLabel,
-  getServiceLabel,
-  getBusinessStageLabel,
+  getLeadTypeLabel,
+  getServiceInterestLabel,
+  getCurrentSituationLabel,
+  getObjectiveLabel,
+  getPreferredCallPeriodLabel,
   getPreferredContactLabel,
   getSourceLabel,
-} from './LeadStatusBadge';
+  getLeadServices,
+  getLeadSituations,
+  getLeadObjectives,
+  getLeadNotesOrMessage,
+  hasLeadUtmData,
+  getLeadEntityDisplay,
+} from '../../utils/leadFormatters';
 
 interface LeadDetailDrawerProps {
   lead: Lead | null;
@@ -105,6 +123,45 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
     setShowDiscardConfirm(false);
   };
 
+  // Helpers de formatação e URLs
+  const entityDisplay = getLeadEntityDisplay(lead);
+  const services = getLeadServices(lead);
+  const situations = getLeadSituations(lead);
+  const objectives = getLeadObjectives(lead);
+  const notesOrMessage = getLeadNotesOrMessage(lead);
+  const hasUtm = hasLeadUtmData(lead);
+
+  const getSafeUrl = (urlStr?: string | null): string | null => {
+    if (!urlStr) return null;
+    const trimmed = urlStr.trim();
+    if (!trimmed) return null;
+    if (/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+    if (/^www\./i.test(trimmed)) {
+      return `https://${trimmed}`;
+    }
+    return null;
+  };
+
+  const getCleanPhone = (phoneStr?: string | null): string | null => {
+    if (!phoneStr) return null;
+    const clean = phoneStr.replace(/\D/g, '');
+    if (!clean) return null;
+    if (clean.length === 10 || clean.length === 11) {
+      return `55${clean}`;
+    }
+    return clean;
+  };
+
+  const webOrInstaUrl = getSafeUrl(lead.website_or_instagram);
+  const isInstagramHandle =
+    lead.website_or_instagram &&
+    !webOrInstaUrl &&
+    lead.website_or_instagram.trim().startsWith('@');
+
+  const cleanWaNumber = getCleanPhone(lead.whatsapp);
+
   return (
     <>
       {/* Backdrop */}
@@ -120,17 +177,30 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
       >
         {/* Header */}
         <div className="p-6 border-b border-[#E8E9EA] bg-[#FAFAFA] flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-xl font-semibold text-[#1D1D1D]">
-                {lead.name}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-xl font-semibold text-[#1D1D1D] truncate">
+                {entityDisplay.title}
               </h2>
+              {entityDisplay.badge && (
+                <span
+                  id="lead-badge-type"
+                  className="px-2 py-0.5 text-xs font-semibold rounded-md bg-[#F2F3F3] text-[#555557] border border-[#E0E1E2]"
+                >
+                  {entityDisplay.badge}
+                </span>
+              )}
               <LeadStatusBadge status={selectedStatus} size="md" />
             </div>
-            {lead.business_name && (
-              <p className="text-sm font-medium text-[#666668] mt-1 flex items-center gap-1.5">
-                <Building2 className="w-4 h-4 text-[#9E9EA0]" />
-                {lead.business_name}
+
+            {entityDisplay.subtitle && (
+              <p className="text-sm font-medium text-[#666668] mt-1 flex items-center gap-1.5 truncate">
+                {lead.lead_type === 'business' ? (
+                  <User className="w-3.5 h-3.5 text-[#9E9EA0] shrink-0" />
+                ) : (
+                  <Compass className="w-3.5 h-3.5 text-[#9E9EA0] shrink-0" />
+                )}
+                <span>{entityDisplay.subtitle}</span>
               </p>
             )}
           </div>
@@ -139,7 +209,7 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
             id="btn-close-drawer"
             type="button"
             onClick={handleAttemptClose}
-            className="p-1.5 text-[#666668] hover:text-[#1D1D1D] hover:bg-[#E8E9EA]/60 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-[#666668] hover:text-[#1D1D1D] hover:bg-[#E8E9EA]/60 rounded-lg transition-colors cursor-pointer shrink-0"
             title="Fechar"
           >
             <X className="w-5 h-5" />
@@ -151,7 +221,7 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
           {/* Success Banner */}
           {saveSuccess && (
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2.5 text-xs text-emerald-800 font-semibold animate-in fade-in">
-              <Check className="w-4 h-4 text-emerald-600" />
+              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>Status atualizado com sucesso!</span>
             </div>
           )}
@@ -212,115 +282,375 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
             )}
           </div>
 
-          {/* Section 1: Contato */}
+          {/* Seção 1: Identificação */}
           <div className="space-y-3">
-            <h3 className="text-xs font-semibold text-[#666668] uppercase tracking-wider">
-              Dados de Contato
+            <h3 className="text-xs font-semibold text-[#666668] uppercase tracking-wider flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5 text-[#9E9EA0]" />
+              Identificação
+            </h3>
+            <div className="bg-white border border-[#E8E9EA] rounded-xl divide-y divide-[#E8E9EA]">
+              {lead.lead_type && (
+                <div className="p-3.5 flex items-center justify-between gap-4">
+                  <span className="text-xs text-[#666668]">Tipo de Lead</span>
+                  <span className="text-sm font-medium text-[#1D1D1D]">
+                    {getLeadTypeLabel(lead.lead_type)}
+                  </span>
+                </div>
+              )}
+
+              {lead.business_name && (
+                <div className="p-3.5 flex items-center justify-between gap-4">
+                  <span className="text-xs text-[#666668]">
+                    {lead.lead_type === 'self_employed' ? 'Nome Profissional / Marca' : 'Empresa'}
+                  </span>
+                  <span className="text-sm font-medium text-[#1D1D1D]">
+                    {lead.business_name}
+                  </span>
+                </div>
+              )}
+
+              {lead.name && (
+                <div className="p-3.5 flex items-center justify-between gap-4">
+                  <span className="text-xs text-[#666668]">Nome do Contato</span>
+                  <span className="text-sm font-medium text-[#1D1D1D]">{lead.name}</span>
+                </div>
+              )}
+
+              {lead.segment_or_profession && (
+                <div className="p-3.5 flex items-center justify-between gap-4">
+                  <span className="text-xs text-[#666668]">
+                    {lead.lead_type === 'self_employed' ? 'Profissão / Especialidade' : 'Segmento'}
+                  </span>
+                  <span className="text-sm font-medium text-[#1D1D1D]">
+                    {lead.segment_or_profession}
+                  </span>
+                </div>
+              )}
+
+              {lead.website_or_instagram && (
+                <div className="p-3.5 flex items-center justify-between gap-4">
+                  <span className="text-xs text-[#666668]">Site ou Instagram</span>
+                  <div className="text-sm font-medium text-[#1D1D1D]">
+                    {webOrInstaUrl ? (
+                      <a
+                        href={webOrInstaUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[#F15A3C] hover:underline"
+                      >
+                        <span className="truncate max-w-[240px]">{lead.website_or_instagram}</span>
+                        <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                      </a>
+                    ) : isInstagramHandle ? (
+                      <a
+                        href={`https://instagram.com/${lead.website_or_instagram.replace('@', '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[#F15A3C] hover:underline"
+                      >
+                        <span>{lead.website_or_instagram}</span>
+                        <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                      </a>
+                    ) : (
+                      <span>{lead.website_or_instagram}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Seção 2: Contato & Atendimento */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-[#666668] uppercase tracking-wider flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5 text-[#9E9EA0]" />
+              Contato & Atendimento
             </h3>
             <div className="bg-white border border-[#E8E9EA] rounded-xl divide-y divide-[#E8E9EA]">
               {/* WhatsApp */}
               <div className="p-3.5 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2.5 text-xs text-[#666668]">
-                  <Phone className="w-4 h-4 text-[#9E9EA0]" />
-                  <span>WhatsApp</span>
+                <div className="flex items-center gap-2 text-xs text-[#666668]">
+                  <Phone className="w-3.5 h-3.5 text-[#9E9EA0]" />
+                  <span>WhatsApp / Telefone</span>
                 </div>
-                <div className="text-sm font-medium text-[#1D1D1D]">
-                  {lead.whatsapp || <span className="text-[#9E9EA0] font-normal italic">Não informado</span>}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-[#1D1D1D]">
+                    {lead.whatsapp || <span className="text-[#9E9EA0] font-normal italic">Não informado</span>}
+                  </span>
+                  {cleanWaNumber && (
+                    <div className="flex items-center gap-1">
+                      <a
+                        href={`https://wa.me/${cleanWaNumber}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
+                        title="Abrir WhatsApp"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                      <a
+                        href={`tel:+${cleanWaNumber}`}
+                        className="p-1 text-[#F15A3C] hover:bg-[#FDF1EE] rounded-md transition-colors"
+                        title="Fazer ligação"
+                      >
+                        <PhoneCall className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Email */}
               <div className="p-3.5 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2.5 text-xs text-[#666668]">
-                  <Mail className="w-4 h-4 text-[#9E9EA0]" />
+                <div className="flex items-center gap-2 text-xs text-[#666668]">
+                  <Mail className="w-3.5 h-3.5 text-[#9E9EA0]" />
                   <span>E-mail</span>
                 </div>
-                <div className="text-sm font-medium text-[#1D1D1D]">
-                  {lead.email || <span className="text-[#9E9EA0] font-normal italic">Não informado</span>}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-[#1D1D1D]">
+                    {lead.email || <span className="text-[#9E9EA0] font-normal italic">Não informado</span>}
+                  </span>
+                  {lead.email && (
+                    <a
+                      href={`mailto:${lead.email}`}
+                      className="p-1 text-[#F15A3C] hover:bg-[#FDF1EE] rounded-md transition-colors"
+                      title="Enviar e-mail"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
                 </div>
               </div>
 
               {/* Preferência de Contato */}
               <div className="p-3.5 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2.5 text-xs text-[#666668]">
-                  <FileText className="w-4 h-4 text-[#9E9EA0]" />
-                  <span>Preferência de Contato</span>
-                </div>
-                <div className="text-sm font-medium text-[#1D1D1D]">
-                  {getPreferredContactLabel(lead.preferred_contact)}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Briefing */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-semibold text-[#666668] uppercase tracking-wider">
-              Briefing & Interesse
-            </h3>
-            <div className="bg-white border border-[#E8E9EA] rounded-xl p-4.5 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <span className="text-xs text-[#666668] block">Serviço Solicitado</span>
-                  <span className="text-sm font-medium text-[#1D1D1D] mt-0.5 inline-block">
-                    {getServiceLabel(lead.service)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-xs text-[#666668] block">Momento do Negócio</span>
-                  <span className="text-sm font-medium text-[#1D1D1D] mt-0.5 inline-block">
-                    {getBusinessStageLabel(lead.business_stage)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Mensagem Original */}
-              <div className="pt-3 border-t border-[#E8E9EA]">
-                <span className="text-xs text-[#666668] block mb-1.5">Mensagem / Descrição</span>
-                <div className="bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg p-3.5 text-sm text-[#1D1D1D] leading-relaxed whitespace-pre-wrap">
-                  {lead.message || (
-                    <span className="text-[#9E9EA0] italic">Nenhuma mensagem adicional informada.</span>
+                <div className="flex items-center gap-2 text-xs text-[#666668]">
+                  {lead.preferred_contact === 'phone' ? (
+                    <PhoneCall className="w-3.5 h-3.5 text-[#F15A3C]" />
+                  ) : (
+                    <FileText className="w-3.5 h-3.5 text-[#9E9EA0]" />
                   )}
+                  <span>Canal Preferido</span>
+                </div>
+                <div className="text-sm font-medium text-[#1D1D1D] flex items-center gap-1.5">
+                  {lead.preferred_contact === 'phone' && (
+                    <span className="px-1.5 py-0.5 rounded text-xs bg-amber-50 text-amber-700 border border-amber-200">
+                      Ligação
+                    </span>
+                  )}
+                  <span>{getPreferredContactLabel(lead.preferred_contact)}</span>
                 </div>
               </div>
+
+              {/* Melhor Período para Contato */}
+              {lead.preferred_call_period && (
+                <div className="p-3.5 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 text-xs text-[#666668]">
+                    <Clock className="w-3.5 h-3.5 text-[#9E9EA0]" />
+                    <span>Melhor Período</span>
+                  </div>
+                  <div className="text-sm font-medium text-[#1D1D1D]">
+                    {getPreferredCallPeriodLabel(lead.preferred_call_period)}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Section 3: Registro */}
+          {/* Seção 3: Interesses & Escopo Solicitado */}
           <div className="space-y-3">
-            <h3 className="text-xs font-semibold text-[#666668] uppercase tracking-wider">
-              Metadados do Registro
+            <h3 className="text-xs font-semibold text-[#666668] uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#F15A3C]" />
+              Interesses & Escopo Solicitado
+            </h3>
+            <div className="bg-white border border-[#E8E9EA] rounded-xl p-4">
+              {services.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {services.map((svcKey, idx) => (
+                    <span
+                      key={`${svcKey}-${idx}`}
+                      className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#FDF1EE] text-[#F15A3C] border border-[#FBC3B8]"
+                    >
+                      {getServiceInterestLabel(svcKey)}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-xs text-[#9E9EA0] italic">
+                  Nenhum serviço especificado.
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Seção 4: Situação Atual */}
+          {situations.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold text-[#666668] uppercase tracking-wider flex items-center gap-1.5">
+                <Compass className="w-3.5 h-3.5 text-[#9E9EA0]" />
+                Situação Atual
+              </h3>
+              <div className="bg-white border border-[#E8E9EA] rounded-xl p-4">
+                <ul className="space-y-2">
+                  {situations.map((sitKey, idx) => (
+                    <li key={`${sitKey}-${idx}`} className="flex items-start gap-2 text-sm text-[#1D1D1D]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#666668] mt-2 shrink-0" />
+                      <span className="leading-snug">
+                        {getCurrentSituationLabel(sitKey, lead.lead_type)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* Seção 5: Objetivos */}
+          {objectives.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold text-[#666668] uppercase tracking-wider flex items-center gap-1.5">
+                <Target className="w-3.5 h-3.5 text-[#059669]" />
+                Objetivos de Marketing & Negócio
+              </h3>
+              <div className="bg-white border border-[#E8E9EA] rounded-xl p-4">
+                <ul className="space-y-2">
+                  {objectives.map((objKey, idx) => (
+                    <li key={`${objKey}-${idx}`} className="flex items-start gap-2.5 text-sm text-[#1D1D1D]">
+                      <Check className="w-4 h-4 text-[#059669] shrink-0 mt-0.5" />
+                      <span className="leading-snug">
+                        {getObjectiveLabel(objKey, lead.lead_type)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* Seção 6: Observações / Mensagem */}
+          {notesOrMessage && (
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold text-[#666668] uppercase tracking-wider flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-[#9E9EA0]" />
+                {lead.notes ? 'Observações do Briefing' : 'Mensagem / Descrição'}
+              </h3>
+              <div className="bg-[#F7F7F8] border border-[#E8E9EA] rounded-xl p-4 text-sm text-[#1D1D1D] leading-relaxed whitespace-pre-wrap">
+                {notesOrMessage}
+              </div>
+            </div>
+          )}
+
+          {/* Seção 7: Origem & Rastreabilidade */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-[#666668] uppercase tracking-wider flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5 text-[#9E9EA0]" />
+              Origem & Rastreabilidade
             </h3>
             <div className="bg-white border border-[#E8E9EA] rounded-xl divide-y divide-[#E8E9EA]">
               <div className="p-3.5 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2.5 text-xs text-[#666668]">
-                  <Globe className="w-4 h-4 text-[#9E9EA0]" />
-                  <span>Origem</span>
-                </div>
-                <div className="text-sm font-medium text-[#1D1D1D]">
+                <span className="text-xs text-[#666668]">Canal de Origem</span>
+                <span className="text-sm font-medium text-[#1D1D1D]">
                   {getSourceLabel(lead.source)}
-                </div>
+                </span>
               </div>
 
               <div className="p-3.5 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2.5 text-xs text-[#666668]">
-                  <Calendar className="w-4 h-4 text-[#9E9EA0]" />
-                  <span>Data de Entrada</span>
-                </div>
-                <div className="text-sm font-medium text-[#1D1D1D]">
+                <span className="text-xs text-[#666668]">Data de Entrada</span>
+                <span className="text-sm font-medium text-[#1D1D1D]">
                   {formatDate(lead.created_at)}
-                </div>
+                </span>
               </div>
 
               {lead.updated_at && (
                 <div className="p-3.5 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-2.5 text-xs text-[#666668]">
-                    <Clock className="w-4 h-4 text-[#9E9EA0]" />
-                    <span>Última Atualização</span>
-                  </div>
-                  <div className="text-sm font-medium text-[#1D1D1D]">
+                  <span className="text-xs text-[#666668]">Última Atualização</span>
+                  <span className="text-sm font-medium text-[#1D1D1D]">
                     {formatDate(lead.updated_at)}
+                  </span>
+                </div>
+              )}
+
+              {/* Bloco Secundário de Campanhas e UTMs */}
+              {hasUtm && (
+                <div className="p-4 bg-[#FAFAFA] space-y-2.5">
+                  <span className="text-2xs font-semibold uppercase tracking-wider text-[#9E9EA0] block">
+                    Parâmetros de Campanha (UTM)
+                  </span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                    {lead.utm_source && (
+                      <div className="p-2 bg-white rounded-md border border-[#E8E9EA]">
+                        <span className="text-[#9E9EA0] block text-2xs uppercase">UTM Source</span>
+                        <span className="font-medium text-[#1D1D1D]">{lead.utm_source}</span>
+                      </div>
+                    )}
+
+                    {lead.utm_medium && (
+                      <div className="p-2 bg-white rounded-md border border-[#E8E9EA]">
+                        <span className="text-[#9E9EA0] block text-2xs uppercase">UTM Medium</span>
+                        <span className="font-medium text-[#1D1D1D]">{lead.utm_medium}</span>
+                      </div>
+                    )}
+
+                    {lead.utm_campaign && (
+                      <div className="p-2 bg-white rounded-md border border-[#E8E9EA]">
+                        <span className="text-[#9E9EA0] block text-2xs uppercase">UTM Campaign</span>
+                        <span className="font-medium text-[#1D1D1D]">{lead.utm_campaign}</span>
+                      </div>
+                    )}
+
+                    {lead.utm_content && (
+                      <div className="p-2 bg-white rounded-md border border-[#E8E9EA]">
+                        <span className="text-[#9E9EA0] block text-2xs uppercase">UTM Content</span>
+                        <span className="font-medium text-[#1D1D1D]">{lead.utm_content}</span>
+                      </div>
+                    )}
+
+                    {lead.utm_term && (
+                      <div className="p-2 bg-white rounded-md border border-[#E8E9EA]">
+                        <span className="text-[#9E9EA0] block text-2xs uppercase">UTM Term</span>
+                        <span className="font-medium text-[#1D1D1D]">{lead.utm_term}</span>
+                      </div>
+                    )}
                   </div>
+
+                  {lead.referrer && (
+                    <div className="pt-2 text-xs">
+                      <span className="text-[#9E9EA0] block text-2xs uppercase">Referrer</span>
+                      {getSafeUrl(lead.referrer) ? (
+                        <a
+                          href={getSafeUrl(lead.referrer)!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[#F15A3C] hover:underline break-all"
+                        >
+                          <span>{lead.referrer}</span>
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
+                      ) : (
+                        <span className="text-[#1D1D1D] break-all">{lead.referrer}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {lead.landing_url && (
+                    <div className="pt-1 text-xs">
+                      <span className="text-[#9E9EA0] block text-2xs uppercase">Landing URL</span>
+                      {getSafeUrl(lead.landing_url) ? (
+                        <a
+                          href={getSafeUrl(lead.landing_url)!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[#F15A3C] hover:underline break-all"
+                        >
+                          <span>{lead.landing_url}</span>
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
+                      ) : (
+                        <span className="text-[#1D1D1D] break-all">{lead.landing_url}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -400,4 +730,5 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
     </>
   );
 };
+
 

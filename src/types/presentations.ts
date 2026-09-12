@@ -103,3 +103,56 @@ export interface PresentationMetrics {
   approvedCount: number;
   changesRequestedCount: number;
 }
+
+/**
+ * Canonical interface for public.presentation_access_links
+ */
+export interface PresentationAccessLink {
+  id: string;
+  presentation_id: string;
+  token_hash: string;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  revoked_by: string | null;
+  // Client-side computed properties
+  token?: string | null;
+  public_url?: string | null;
+  is_active?: boolean;
+}
+
+export interface CreatePresentationAccessLinkResponse {
+  id?: string;
+  presentation_id?: string;
+  token: string;
+  public_url: string;
+  created_at?: string;
+  expires_at?: string | null;
+  link?: PresentationAccessLink | null;
+}
+
+export type PublicPresentationErrorType =
+  | 'INVALID_TOKEN'
+  | 'REVOKED_TOKEN'
+  | 'EXPIRED_TOKEN'
+  | 'NOT_FOUND'
+  | 'SERVER_ERROR';
+
+export interface PublicPresentationError {
+  type: PublicPresentationErrorType;
+  title: string;
+  message: string;
+  actionHint?: string;
+  rawError?: unknown;
+}
+
+export interface PublicPresentationData extends Presentation {
+  items: PresentationItem[];
+  access_info?: {
+    expires_at?: string | null;
+    created_at?: string;
+  };
+}
+

@@ -97,7 +97,6 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
   const [funnelStage, setFunnelStage] = useState('');
   const [copy, setCopy] = useState('');
   const [caption, setCaption] = useState('');
-  const [script, setScript] = useState('');
   const [plannedDate, setPlannedDate] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [notes, setNotes] = useState('');
@@ -115,7 +114,6 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
       setFunnelStage(content.funnel_stage || '');
       setCopy(content.copy || '');
       setCaption(content.caption || '');
-      setScript(content.script || '');
       setPlannedDate(formatDate(content.planned_date));
       setAssignedTo(content.assigned_to || '');
       setNotes(content.notes || '');
@@ -137,7 +135,6 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
     const origFunnel = content.funnel_stage ? content.funnel_stage.trim().toLowerCase() : '';
     const origCopy = (content.copy || '').trim();
     const origCaption = (content.caption || '').trim();
-    const origScript = (content.script || '').trim();
     const origPlannedDate = formatDate(content.planned_date);
     const origAssignedTo = content.assigned_to || '';
     const origNotes = (content.notes || '').trim();
@@ -153,7 +150,6 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
       (funnelStage ? funnelStage.trim().toLowerCase() : '') !== origFunnel ||
       copy.trim() !== origCopy ||
       caption.trim() !== origCaption ||
-      script.trim() !== origScript ||
       plannedDate !== origPlannedDate ||
       assignedTo !== origAssignedTo ||
       notes.trim() !== origNotes
@@ -170,7 +166,6 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
     funnelStage,
     copy,
     caption,
-    script,
     plannedDate,
     assignedTo,
     notes,
@@ -202,7 +197,7 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
         funnel_stage: funnelStage ? funnelStage.trim().toLowerCase() : null,
         copy: copy.trim() || null,
         caption: caption.trim() || null,
-        script: script.trim() || null,
+        script: content.script ?? null,
         planned_date: plannedDate || null,
         assigned_to: assignedTo || null,
         notes: notes.trim() || null,
@@ -486,47 +481,6 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
             {/* TAB 3: CRIAÇÃO & REDAÇÃO */}
             {activeTab === 'creation' && (
               <div className="space-y-4">
-                {/* Roteiro para Reels ou Stories */}
-                {(format === 'reels' || format === 'story') && (
-                  <div
-                    className={`p-4 rounded-xl space-y-2 border ${
-                      format === 'reels'
-                        ? 'bg-rose-50/50 border-rose-200'
-                        : 'bg-purple-50/50 border-purple-200'
-                    }`}
-                  >
-                    <label
-                      className={`block text-xs font-bold flex items-center justify-between ${
-                        format === 'reels' ? 'text-rose-900' : 'text-purple-900'
-                      }`}
-                    >
-                      <span>
-                        {format === 'reels'
-                          ? 'Roteiro / Script do Vídeo (Cenas, Falas & Instruções)'
-                          : 'Roteiro / Sequência de Stories (Script)'}
-                      </span>
-                      <span
-                        className={`text-[10px] uppercase font-semibold ${
-                          format === 'reels' ? 'text-rose-700' : 'text-purple-700'
-                        }`}
-                      >
-                        {FORMAT_LABELS[format]}
-                      </span>
-                    </label>
-                    <textarea
-                      rows={7}
-                      value={script}
-                      onChange={(e) => setScript(e.target.value)}
-                      placeholder={
-                        format === 'reels'
-                          ? "[0-3s GANCHO]: Frase de abertura de alto impacto\n[3-20s CORPO]: Desenvolvimento das ideias centrais...\n[20-30s CTA]: Chamada para comentários ou direct..."
-                          : "[STORY 1]: Enquete interativa ou introdução\n[STORY 2]: Conteúdo / bastidores...\n[STORY 3]: Link ou chamada para ação..."
-                      }
-                      className="w-full p-3 text-xs font-mono text-[#1D1D1D] bg-white border border-[#E8E9EA] rounded-lg focus:outline-none focus:border-[#1D1D1D] leading-relaxed"
-                    />
-                  </div>
-                )}
-
                 {/* Legenda Final (Caption) */}
                 <div>
                   <label className="block text-xs font-bold text-[#1D1D1D] mb-1.5 flex items-center justify-between">

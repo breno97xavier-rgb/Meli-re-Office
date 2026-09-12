@@ -56,7 +56,7 @@ export const ContentFiltersBar: React.FC<ContentFiltersBarProps> = ({
             type="text"
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Buscar por título, objetivo, pilar, texto na arte, legenda..."
+            placeholder="Buscar por título, objetivo, pilar, legenda..."
             className="w-full pl-9.5 pr-8 py-2 text-xs font-medium text-[#1D1D1D] bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg focus:outline-none focus:bg-white focus:border-[#1D1D1D] placeholder:text-[#8C8D8F] transition-all"
           />
           {searchTerm && (

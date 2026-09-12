@@ -6,8 +6,8 @@ import {
   Plus,
   Edit2,
   RefreshCw,
-  Send,
-  Calendar,
+  Share2,
+  Play,
 } from 'lucide-react';
 import { Presentation } from '../../types/presentations';
 import { PresentationStatusBadge } from './PresentationStatusBadge';
@@ -17,8 +17,10 @@ interface PresentationEditorHeaderProps {
   itemsCount: number;
   loading: boolean;
   onBack: () => void;
+  onPresent: () => void;
   onOpenAddContents: () => void;
   onOpenEditMetadata: () => void;
+  onOpenShare: () => void;
   onRefresh: () => void;
 }
 
@@ -27,8 +29,10 @@ export const PresentationEditorHeader: React.FC<PresentationEditorHeaderProps> =
   itemsCount,
   loading,
   onBack,
+  onPresent,
   onOpenAddContents,
   onOpenEditMetadata,
+  onOpenShare,
   onRefresh,
 }) => {
   const clientName =
@@ -102,6 +106,26 @@ export const PresentationEditorHeader: React.FC<PresentationEditorHeaderProps> =
 
           <button
             type="button"
+            onClick={onPresent}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-[#1D1D1D] hover:bg-[#333333] rounded-xl transition-all cursor-pointer shadow-2xs active:scale-98"
+            title="Iniciar modo de apresentação executiva"
+          >
+            <Play className="w-3.5 h-3.5 fill-current text-[#F15A3C]" />
+            <span>Apresentar</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenShare}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#1D1D1D] bg-[#F7F7F8] hover:bg-[#FDF1EE] hover:text-[#F15A3C] hover:border-[#F15A3C]/30 border border-[#E8E9EA] rounded-xl transition-all cursor-pointer shadow-2xs"
+            title="Gerenciar link de acesso do cliente"
+          >
+            <Share2 className="w-3.5 h-3.5 text-[#F15A3C]" />
+            <span>Compartilhar</span>
+          </button>
+
+          <button
+            type="button"
             onClick={onOpenEditMetadata}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#1D1D1D] bg-[#F7F7F8] hover:bg-[#EDEEEE] border border-[#E8E9EA] rounded-xl transition-colors cursor-pointer shadow-2xs"
           >
@@ -119,6 +143,7 @@ export const PresentationEditorHeader: React.FC<PresentationEditorHeaderProps> =
           </button>
         </div>
       </div>
+
 
       {/* Bottom info summary */}
       <div className="flex items-center justify-between text-xs text-[#666668] pt-3 border-t border-[#F2F3F3]">

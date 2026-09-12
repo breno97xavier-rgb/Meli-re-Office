@@ -13,14 +13,24 @@ import { ClientProfilePage } from '@/src/pages/ClientProfilePage';
 import { ContentsPage } from '@/src/pages/ContentsPage';
 import { PresentationsPage } from '@/src/pages/PresentationsPage';
 import { PresentationEditorPage } from '@/src/pages/PresentationEditorPage';
+import { PresentationViewerPage } from '@/src/pages/PresentationViewerPage';
 import { PlaceholderModulePage } from '@/src/pages/PlaceholderModulePage';
 import { LoginPage } from '@/src/pages/LoginPage';
 import { LoadingGate } from '@/src/components/auth/LoadingGate';
 import { AccessDenied } from '@/src/components/auth/AccessDenied';
+import { PublicPresentationPage } from '@/src/pages/PublicPresentationPage';
 
 function AppContent() {
   const { user, profile, isLoading, isUnauthorized, signOut } = useAuth();
   const { currentPath, navigate } = useRouter();
+
+  // 0. PUBLIC ROUTES: Public Presentation (/apresentacao/:token)
+  // Accessible anonymously without authentication, without OfficeLayout, without admin guards
+  if (currentPath.startsWith('/apresentacao/') || currentPath === '/apresentacao') {
+    const rawToken = currentPath.replace(/^\/apresentacao\/?/, '').split('/')[0]?.split('?')[0];
+    const token = rawToken ? decodeURIComponent(rawToken) : '';
+    return <PublicPresentationPage token={token} />;
+  }
 
   // Redirect to /dashboard if already authenticated and accessing /login
   useEffect(() => {
@@ -44,7 +54,15 @@ function AppContent() {
     return <LoginPage />;
   }
 
-  // 4. Authenticated + Valid Profile: Render inside OfficeLayout
+  // 4. Authenticated presentation mode: render fullscreen presentation outside OfficeLayout
+  if (currentPath.startsWith('/apresentacoes/') && currentPath.endsWith('/apresentar')) {
+    const presentationId = currentPath.replace('/apresentacoes/', '').split('/')[0];
+    if (presentationId) {
+      return <PresentationViewerPage presentationId={presentationId} />;
+    }
+  }
+
+  // 5. Authenticated + Valid Profile: Render inside OfficeLayout
   const renderContent = () => {
     switch (currentPath) {
       case '/':

@@ -19,7 +19,22 @@ export async function fetchLeads(): Promise<Lead[]> {
       status,
       source,
       metadata,
-      assigned_to
+      assigned_to,
+      lead_type,
+      segment_or_profession,
+      website_or_instagram,
+      notes,
+      services_interest,
+      current_situation,
+      objectives,
+      preferred_call_period,
+      utm_source,
+      utm_medium,
+      utm_campaign,
+      utm_content,
+      utm_term,
+      referrer,
+      landing_url
     `)
     .order('created_at', { ascending: false });
 

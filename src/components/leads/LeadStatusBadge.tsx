@@ -1,27 +1,19 @@
 import React from 'react';
-import { LeadStatus, LeadService, BusinessStage, PreferredContact, LeadSource } from '../../types/leads';
+import { LeadStatus } from '../../types/leads';
+import {
+  getStatusLabel,
+  getServiceInterestLabel,
+  getCurrentSituationLabel,
+  getPreferredContactLabel as formatPreferredContact,
+  getSourceLabel as formatSource,
+} from '../../utils/leadFormatters';
 
 interface LeadStatusBadgeProps {
   status: LeadStatus;
   size?: 'sm' | 'md';
 }
 
-export function getStatusLabel(status: LeadStatus): string {
-  switch (status) {
-    case 'new':
-      return 'Novo';
-    case 'contacted':
-      return 'Contatado';
-    case 'qualified':
-      return 'Qualificado';
-    case 'disqualified':
-      return 'Desqualificado';
-    case 'converted':
-      return 'Convertido';
-    default:
-      return status;
-  }
-}
+export { getStatusLabel };
 
 export function getStatusBadgeStyles(status: LeadStatus): string {
   switch (status) {
@@ -68,66 +60,19 @@ export const LeadStatusBadge: React.FC<LeadStatusBadgeProps> = ({ status, size =
   );
 };
 
-export function getServiceLabel(service?: LeadService | null): string {
-  if (!service) return 'Não especificado';
-  switch (service) {
-    case 'social_media':
-      return 'Social Media';
-    case 'paid_traffic':
-      return 'Tráfego Pago';
-    case 'website':
-      return 'Site / Portfólio';
-    case 'branding':
-      return 'Branding';
-    case 'not_sure':
-      return 'Ainda não definido';
-    default:
-      return service;
-  }
+export function getServiceLabel(service?: string | null): string {
+  return getServiceInterestLabel(service);
 }
 
-export function getBusinessStageLabel(stage?: BusinessStage | null): string {
-  if (!stage) return 'Não informado';
-  switch (stage) {
-    case 'starting':
-      return 'Começando agora';
-    case 'needs_structure':
-      return 'Precisa de estruturação';
-    case 'has_presence':
-      return 'Já possui presença digital';
-    case 'professionalizing':
-      return 'Profissionalizando a marca';
-    default:
-      return stage;
-  }
+export function getBusinessStageLabel(stage?: string | null): string {
+  return getCurrentSituationLabel(stage, null);
 }
 
-export function getPreferredContactLabel(contact?: PreferredContact | null): string {
-  if (!contact) return 'Sem preferência';
-  switch (contact) {
-    case 'whatsapp':
-      return 'WhatsApp';
-    case 'email':
-      return 'E-mail';
-    default:
-      return contact;
-  }
+export function getPreferredContactLabel(contact?: string | null): string {
+  return formatPreferredContact(contact);
 }
 
-export function getSourceLabel(source?: LeadSource | null): string {
-  if (!source) return 'Outro';
-  switch (source) {
-    case 'website':
-      return 'Site Público';
-    case 'prospecting':
-      return 'Prospecção Ativa';
-    case 'referral':
-      return 'Indicação';
-    case 'instagram':
-      return 'Instagram';
-    case 'whatsapp':
-      return 'WhatsApp Direto';
-    default:
-      return source;
-  }
+export function getSourceLabel(source?: string | null): string {
+  return formatSource(source);
 }
+

@@ -57,7 +57,6 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
   const [funnelStage, setFunnelStage] = useState('');
   const [copy, setCopy] = useState('');
   const [caption, setCaption] = useState('');
-  const [script, setScript] = useState('');
   const [plannedDate, setPlannedDate] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [notes, setNotes] = useState('');
@@ -76,7 +75,6 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
       setFunnelStage('');
       setCopy('');
       setCaption('');
-      setScript('');
       setPlannedDate('');
       setAssignedTo('');
       setNotes('');
@@ -111,7 +109,7 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
         funnel_stage: funnelStage ? funnelStage.trim().toLowerCase() : null,
         copy: copy.trim() || null,
         caption: caption.trim() || null,
-        script: script.trim() || null,
+        script: null,
         planned_date: plannedDate || null,
         assigned_to: assignedTo || null,
         notes: notes.trim() || null,
@@ -307,108 +305,36 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
             </div>
           </div>
 
-          {/* Section 3: Redação & Criação (Contextual ao Formato) */}
+          {/* Section 3: Redação & Criação */}
           <div className="space-y-4">
             <div className="flex items-center justify-between pb-1 border-b border-[#F2F3F3]">
               <h3 className="text-xs font-bold text-[#1D1D1D] uppercase tracking-wider flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5 text-[#F15A3C]" />
-                <span>Conteúdo & Redação ({FORMAT_LABELS[format]})</span>
+                <span>Conteúdo & Redação</span>
               </h3>
               <span className="text-[11px] text-[#8C8D8F]">
-                Campos adaptados ao formato {FORMAT_LABELS[format]}
+                {FORMAT_LABELS[format]}
               </span>
             </div>
 
-            {/* Se Reels: Destaque para Roteiro */}
-            {format === 'reels' && (
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#1D1D1D] mb-1 flex items-center justify-between">
-                    <span>Roteiro / Script (Cenas, Falas & Instruções)</span>
-                    <span className="text-[10px] text-rose-600 font-semibold uppercase">
-                      Destaque para Reels
-                    </span>
-                  </label>
-                  <textarea
-                    rows={5}
-                    value={script}
-                    onChange={(e) => setScript(e.target.value)}
-                    placeholder="[CENA 1 - GANCHO 0-3s]: Olhe para a câmera e diga: 'Você ainda comete esse erro?'&#10;[CENA 2 - DESENVOLVIMENTO]: Mostre a tela do gerenciador...&#10;[CENA 3 - CTA]: Comente X para receber o template."
-                    className="w-full p-3 text-xs font-mono text-[#1D1D1D] bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg focus:outline-none focus:bg-white focus:border-[#1D1D1D] leading-relaxed placeholder:text-[#8C8D8F]"
-                  />
-                </div>
+            {/* Legenda da Publicação (Caption) */}
+            <div>
+              <label className="block text-xs font-bold text-[#1D1D1D] mb-1 flex items-center justify-between">
+                <span>Legenda da Publicação (Caption)</span>
+                <span className="text-[10px] text-[#8C8D8F] font-semibold uppercase">
+                  {FORMAT_LABELS[format]}
+                </span>
+              </label>
+              <textarea
+                rows={5}
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                placeholder="Texto completo da legenda da publicação, estruturado com espaçamentos, copy persuasiva e CTA..."
+                className="w-full p-3 text-xs font-medium text-[#1D1D1D] bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg focus:outline-none focus:bg-white focus:border-[#1D1D1D] placeholder:text-[#8C8D8F] leading-relaxed"
+              />
+            </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-[#666668] mb-1">
-                    Legenda Final (Caption)
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={caption}
-                    onChange={(e) => setCaption(e.target.value)}
-                    placeholder="Texto final para publicação com hashtags e chamada para ação..."
-                    className="w-full p-3 text-xs font-medium text-[#1D1D1D] bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg focus:outline-none focus:bg-white focus:border-[#1D1D1D] placeholder:text-[#8C8D8F]"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Se Post Estático ou Carrossel: Destaque para Legenda */}
-            {(format === 'feed_single' || format === 'carousel') && (
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#1D1D1D] mb-1 flex items-center justify-between">
-                    <span>Legenda da Publicação (Caption)</span>
-                    <span className="text-[10px] text-blue-600 font-semibold uppercase">
-                      Feed
-                    </span>
-                  </label>
-                  <textarea
-                    rows={5}
-                    value={caption}
-                    onChange={(e) => setCaption(e.target.value)}
-                    placeholder="Texto completo da legenda do post, estruturado com espaçamentos, copy persuasiva e CTA..."
-                    className="w-full p-3 text-xs font-medium text-[#1D1D1D] bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg focus:outline-none focus:bg-white focus:border-[#1D1D1D] placeholder:text-[#8C8D8F] leading-relaxed"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Se Story: Roteiro / Ideia dos Stories */}
-            {format === 'story' && (
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#1D1D1D] mb-1 flex items-center justify-between">
-                    <span>Roteiro / Sequência de Stories (Script)</span>
-                    <span className="text-[10px] text-purple-600 font-semibold uppercase">
-                      Destaque para Stories
-                    </span>
-                  </label>
-                  <textarea
-                    rows={5}
-                    value={script}
-                    onChange={(e) => setScript(e.target.value)}
-                    placeholder="[STORY 1]: Enquete: 'Você prefere tráfego pago ou orgânico?'&#10;[STORY 2]: Vídeo de bastidores comentando o resultado...&#10;[STORY 3]: Link direto com sticker para a oferta."
-                    className="w-full p-3 text-xs font-mono text-[#1D1D1D] bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg focus:outline-none focus:bg-white focus:border-[#1D1D1D] leading-relaxed placeholder:text-[#8C8D8F]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#666668] mb-1">
-                    Legenda / Texto Complementar
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={caption}
-                    onChange={(e) => setCaption(e.target.value)}
-                    placeholder="Texto de apoio para os stories ou links..."
-                    className="w-full p-3 text-xs font-medium text-[#1D1D1D] bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg focus:outline-none focus:bg-white focus:border-[#1D1D1D] placeholder:text-[#8C8D8F]"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Copy Geral / Conceito (Opcional para todos) */}
+            {/* Copy Geral / Conceito (Opcional) */}
             <div>
               <label className="block text-xs font-semibold text-[#666668] mb-1">
                 Conceito Geral / Copy de Apoio

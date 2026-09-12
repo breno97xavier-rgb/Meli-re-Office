@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { usePresentationEditor } from '../hooks/usePresentationEditor';
 import { useRouter } from '../hooks/useRouter';
+import type { RoutePath } from '../types';
 import { PresentationEditorHeader } from '../components/presentations/PresentationEditorHeader';
 import { PresentationItemCard } from '../components/presentations/PresentationItemCard';
 import { AddContentsToPresentationModal } from '../components/presentations/AddContentsToPresentationModal';
 import { EditPresentationModal } from '../components/presentations/EditPresentationModal';
+import { SharePresentationModal } from '../components/presentations/SharePresentationModal';
 import {
   Layers,
   Plus,
@@ -42,6 +44,7 @@ export const PresentationEditorPage: React.FC<PresentationEditorPageProps> = ({
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   const handleBack = () => {
     navigate('/apresentacoes');
@@ -97,8 +100,10 @@ export const PresentationEditorPage: React.FC<PresentationEditorPageProps> = ({
         itemsCount={items.length}
         loading={loading}
         onBack={handleBack}
+        onPresent={() => navigate(`/apresentacoes/${presentation.id}/apresentar` as RoutePath)}
         onOpenAddContents={() => setIsAddModalOpen(true)}
         onOpenEditMetadata={() => setIsEditModalOpen(true)}
+        onOpenShare={() => setIsShareModalOpen(true)}
         onRefresh={loadData}
       />
 
@@ -168,6 +173,16 @@ export const PresentationEditorPage: React.FC<PresentationEditorPageProps> = ({
         onSave={handleUpdatePresentation}
         isSaving={isUpdatingPresentation}
       />
+
+      {/* Modal: Share Presentation / Access Link Management */}
+      {isShareModalOpen && (
+        <SharePresentationModal
+          isOpen={isShareModalOpen}
+          presentation={presentation}
+          onClose={() => setIsShareModalOpen(false)}
+        />
+      )}
     </div>
   );
 };
+

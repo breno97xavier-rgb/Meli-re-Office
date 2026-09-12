@@ -6,7 +6,11 @@ import {
 } from '../../types/opportunities';
 import { Lead } from '../../types/leads';
 import { getStageLabel } from './OpportunityStageBadge';
-import { getServiceLabel } from '../leads/LeadStatusBadge';
+import {
+  getServiceInterestLabel,
+  getLeadServices,
+  getLeadEntityDisplay,
+} from '../../utils/leadFormatters';
 
 interface CreateOpportunityModalProps {
   isOpen: boolean;
@@ -22,6 +26,7 @@ const AVAILABLE_SERVICES = [
   'paid_traffic',
   'website',
   'branding',
+  'full_strategy',
 ];
 
 const STAGE_OPTIONS: OpportunityStage[] = [
@@ -54,13 +59,18 @@ export const CreateOpportunityModal: React.FC<CreateOpportunityModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       if (initialLead) {
-        const leadLabel = initialLead.business_name || initialLead.name;
+        const entityDisplay = getLeadEntityDisplay(initialLead);
+        const leadLabel = entityDisplay.title || initialLead.business_name || initialLead.name;
         setTitle(`Negociação — ${leadLabel}`);
-        if (initialLead.service && initialLead.service !== 'not_sure') {
-          setSelectedServices([initialLead.service]);
-        } else {
-          setSelectedServices([]);
-        }
+
+        const leadServices = getLeadServices(initialLead).filter((s) => s !== 'not_sure');
+        const normalizedServices = leadServices.map((svc) => {
+          if (svc === 'website_portfolio') return 'website';
+          if (svc === 'branding_positioning') return 'branding';
+          return svc;
+        });
+
+        setSelectedServices(normalizedServices);
       } else {
         setTitle('');
         setSelectedServices([]);
@@ -84,6 +94,7 @@ export const CreateOpportunityModal: React.FC<CreateOpportunityModalProps> = ({
         : [...prev, serviceKey]
     );
   };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -291,7 +302,7 @@ export const CreateOpportunityModal: React.FC<CreateOpportunityModalProps> = ({
                           : 'bg-white text-[#666668] hover:text-[#1D1D1D] hover:bg-[#F7F7F8] border-[#E8E9EA]'
                       }`}
                     >
-                      {getServiceLabel(svcKey)}
+                      {getServiceInterestLabel(svcKey)}
                     </button>
                   );
                 })}

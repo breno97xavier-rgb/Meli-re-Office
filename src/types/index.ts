@@ -20,6 +20,8 @@ export type RoutePath =
   | '/financeiro'
   | '/inbox'
   | '/configuracoes'
+  | '/apresentacao'
+  | `/apresentacao/${string}`
   | `/clientes/${string}`
   | `/apresentacoes/${string}`;
 
