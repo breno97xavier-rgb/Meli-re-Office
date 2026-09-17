@@ -212,9 +212,12 @@ export const ContentsTable: React.FC<ContentsTableProps> = ({
                   {/* Estratégia (Pilar / Funil) */}
                   <td className="py-3.5 px-4">
                     <div className="flex flex-wrap items-center gap-1.5 max-w-[180px]">
-                      {content.pillar && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-[#F2F3F3] text-[#555557] border border-[#E0E1E2] truncate max-w-[120px]">
-                          {content.pillar}
+                      {(content.client_pillar?.name || content.pillar) && (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-[#F2F3F3] text-[#555557] border border-[#E0E1E2] truncate max-w-[120px]"
+                          title={content.client_pillar?.name || content.pillar || ''}
+                        >
+                          {content.client_pillar?.name || content.pillar}
                         </span>
                       )}
                       {content.funnel_stage && (
@@ -222,7 +225,7 @@ export const ContentsTable: React.FC<ContentsTableProps> = ({
                           {getFunnelStageLabel(content.funnel_stage)}
                         </span>
                       )}
-                      {!content.pillar && !content.funnel_stage && (
+                      {!content.client_pillar?.name && !content.pillar && !content.funnel_stage && (
                         <span className="text-[11px] text-[#A0A0A2]">—</span>
                       )}
                     </div>

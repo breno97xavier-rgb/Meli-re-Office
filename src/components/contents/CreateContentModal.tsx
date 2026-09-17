@@ -1,19 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
-  Plus,
   Loader2,
   AlertCircle,
   Building2,
   Sparkles,
   Layers,
   FileText,
-  Film,
-  Image,
   Calendar,
   User,
-  HelpCircle,
   CheckCircle2,
+  Compass,
+  AlertTriangle,
+  Target,
 } from 'lucide-react';
 import {
   ContentFormat,
@@ -24,7 +23,8 @@ import {
   FUNNEL_STAGES,
 } from '../../types/contents';
 import { Client } from '../../types/clients';
-import { FORMAT_LABELS, EDITORIAL_STATUS_CONFIG } from './ContentStatusBadge';
+import { FORMAT_LABELS } from './ContentStatusBadge';
+import { useContentPlanningOptions } from '../../hooks/useContentPlanningOptions';
 
 interface CreateContentModalProps {
   isOpen: boolean;
@@ -53,7 +53,6 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
   const [primaryChannel, setPrimaryChannel] = useState('instagram');
   const [editorialStatus, setEditorialStatus] = useState<EditorialStatus>('draft');
   const [goal, setGoal] = useState('');
-  const [pillar, setPillar] = useState('');
   const [funnelStage, setFunnelStage] = useState('');
   const [copy, setCopy] = useState('');
   const [caption, setCaption] = useState('');
@@ -61,6 +60,23 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
   const [assignedTo, setAssignedTo] = useState('');
   const [notes, setNotes] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Planning state (optional, independent & nullable)
+  const [editorialPlanId, setEditorialPlanId] = useState('');
+  const [pillarId, setPillarId] = useState('');
+  const [campaignId, setCampaignId] = useState('');
+
+  // Load planning options for selected client
+  const {
+    plans,
+    activePlans,
+    pillars,
+    activePillars,
+    campaigns,
+    activeCampaigns,
+    loading: planningLoading,
+    error: planningError,
+  } = useContentPlanningOptions(clientId || null);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -71,16 +87,67 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
       setPrimaryChannel('instagram');
       setEditorialStatus('draft');
       setGoal('');
-      setPillar('');
       setFunnelStage('');
       setCopy('');
       setCaption('');
       setPlannedDate('');
       setAssignedTo('');
       setNotes('');
+      setEditorialPlanId('');
+      setPillarId('');
+      setCampaignId('');
       setValidationError(null);
     }
   }, [isOpen, initialClientId, clients]);
+
+  // Handle client change: clear planning selections to prevent cross-tenant assignment
+  const handleClientChange = (newClientId: string) => {
+    setClientId(newClientId);
+    setEditorialPlanId('');
+    setPillarId('');
+    setCampaignId('');
+    setValidationError(null);
+  };
+
+  // Find currently selected plan
+  const selectedPlan = useMemo(
+    () => (editorialPlanId ? plans.find((p) => p.id === editorialPlanId) : null),
+    [editorialPlanId, plans]
+  );
+
+  // Determine available pillars based on cycle selection:
+  // - If no cycle: all active client pillars
+  // - If cycle selected: strictly pillars allocated in that cycle
+  const { availablePillars, isCycleWithoutPillars } = useMemo(() => {
+    if (!editorialPlanId || !selectedPlan) {
+      return {
+        availablePillars: activePillars,
+        isCycleWithoutPillars: false,
+      };
+    }
+
+    const allocatedPillarIds = new Set(
+      (selectedPlan.pillars || []).map((pp) => pp.pillar_id)
+    );
+
+    const cyclePillars = pillars.filter(
+      (p) => allocatedPillarIds.has(p.id) && p.is_active
+    );
+
+    return {
+      availablePillars: cyclePillars,
+      isCycleWithoutPillars: (selectedPlan.pillars || []).length === 0 || cyclePillars.length === 0,
+    };
+  }, [editorialPlanId, selectedPlan, activePillars, pillars]);
+
+  // Incompatibility check: operator has a pillar selected, but cycle changed and pillar is NOT allocated in new cycle
+  const isPillarIncompatible = useMemo(() => {
+    if (!editorialPlanId || !pillarId || !selectedPlan) return false;
+    const allocatedPillarIds = new Set(
+      (selectedPlan.pillars || []).map((pp) => pp.pillar_id)
+    );
+    return !allocatedPillarIds.has(pillarId);
+  }, [editorialPlanId, pillarId, selectedPlan]);
 
   if (!isOpen) return null;
 
@@ -96,6 +163,15 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
       setValidationError('Informe o título interno do conteúdo.');
       return;
     }
+    if (isPillarIncompatible) {
+      setValidationError(
+        'O pilar atual não faz parte do novo ciclo selecionado. Selecione um pilar válido ou remova o vínculo.'
+      );
+      return;
+    }
+
+    // Resolve pillar name for legacy compatibility
+    const chosenPillar = pillars.find((p) => p.id === pillarId);
 
     try {
       await onSave({
@@ -105,7 +181,10 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
         primary_channel: primaryChannel ? primaryChannel.trim().toLowerCase() : 'instagram',
         editorial_status: editorialStatus,
         goal: goal.trim() || null,
-        pillar: pillar.trim() || null,
+        pillar: chosenPillar ? chosenPillar.name : null,
+        pillar_id: pillarId || null,
+        editorial_plan_id: editorialPlanId || null,
+        campaign_id: campaignId || null,
         funnel_stage: funnelStage ? funnelStage.trim().toLowerCase() : null,
         copy: copy.trim() || null,
         caption: caption.trim() || null,
@@ -134,7 +213,7 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
                 Novo Conteúdo Editorial
               </h2>
               <p className="text-xs text-[#666668]">
-                Cadastre um novo item de pauta, definindo formato, estratégia e redação.
+                Cadastre um novo item de pauta, definindo formato, planejamento e redação.
               </p>
             </div>
           </div>
@@ -175,7 +254,7 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
                   <select
                     id="content-client-select"
                     value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
+                    onChange={(e) => handleClientChange(e.target.value)}
                     disabled={Boolean(initialClientId)}
                     required
                     className="w-full pl-9 pr-8 py-2 text-xs font-medium text-[#1D1D1D] bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg focus:outline-none focus:border-[#1D1D1D] disabled:opacity-75 disabled:bg-[#EDEEEE] cursor-pointer"
@@ -230,28 +309,152 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Estratégia Editorial */}
+          {/* Section 2: Planejamento Estratégico (Opcional, Não obrigatório) */}
           <div className="space-y-4">
-            <h3 className="text-xs font-bold text-[#1D1D1D] uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-[#F2F3F3]">
-              <Sparkles className="w-3.5 h-3.5 text-[#F15A3C]" />
-              <span>Estratégia & Objetivo</span>
-            </h3>
+            <div className="flex items-center justify-between pb-1 border-b border-[#F2F3F3]">
+              <h3 className="text-xs font-bold text-[#1D1D1D] uppercase tracking-wider flex items-center gap-1.5">
+                <Compass className="w-3.5 h-3.5 text-[#F15A3C]" />
+                <span>Planejamento Estratégico</span>
+              </h3>
+              {planningLoading && (
+                <span className="text-[11px] text-[#8C8D8F] flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin text-[#F15A3C]" />
+                  <span>Carregando opções...</span>
+                </span>
+              )}
+            </div>
+
+            {planningError && (
+              <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                <span>Não foi possível carregar as opções de planejamento: {planningError}</span>
+              </div>
+            )}
+
+            {/* Incompatibility Warning Banner */}
+            {isPillarIncompatible && (
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-start justify-between gap-3 text-xs text-amber-900 animate-in fade-in">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                  <div>
+                    <strong className="font-bold block">Incompatibilidade de Pilar:</strong>
+                    <span>
+                      O pilar atual não faz parte das alocações do novo ciclo selecionado.
+                      Selecione um pilar pertencente ao ciclo ou remova o vínculo.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPillarId('')}
+                  className="px-2.5 py-1 text-[11px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-md transition-colors cursor-pointer shrink-0"
+                >
+                  Remover pilar
+                </button>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Pilar Editorial */}
+              {/* 1. Ciclo de Planejamento */}
+              <div>
+                <label className="block text-xs font-semibold text-[#666668] mb-1.5">
+                  Ciclo de Planejamento
+                </label>
+                <select
+                  value={editorialPlanId}
+                  onChange={(e) => setEditorialPlanId(e.target.value)}
+                  disabled={!clientId || planningLoading}
+                  className="w-full px-3 py-2 text-xs font-medium text-[#1D1D1D] bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg focus:outline-none focus:bg-white focus:border-[#1D1D1D] cursor-pointer disabled:opacity-50"
+                >
+                  <option value="">Sem ciclo definido</option>
+                  {activePlans.length > 0 ? (
+                    activePlans.map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.title} {plan.status === 'draft' ? '(Rascunho)' : ''}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>
+                      Nenhum ciclo ativo disponível
+                    </option>
+                  )}
+                </select>
+              </div>
+
+              {/* 2. Pilar Editorial */}
               <div>
                 <label className="block text-xs font-semibold text-[#666668] mb-1.5">
                   Pilar Editorial
                 </label>
-                <input
-                  type="text"
-                  value={pillar}
-                  onChange={(e) => setPillar(e.target.value)}
-                  placeholder="Ex: Autoridade, Educacional, Vendas"
-                  className="w-full px-3.5 py-2 text-xs font-medium text-[#1D1D1D] bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg focus:outline-none focus:bg-white focus:border-[#1D1D1D] placeholder:text-[#8C8D8F]"
-                />
+                <select
+                  value={pillarId}
+                  onChange={(e) => setPillarId(e.target.value)}
+                  disabled={!clientId || planningLoading || (Boolean(editorialPlanId) && isCycleWithoutPillars)}
+                  className={`w-full px-3 py-2 text-xs font-medium bg-[#F7F7F8] border rounded-lg focus:outline-none focus:bg-white cursor-pointer disabled:opacity-50 ${
+                    isPillarIncompatible
+                      ? 'border-amber-400 text-amber-900 bg-amber-50/50'
+                      : 'border-[#E8E9EA] text-[#1D1D1D] focus:border-[#1D1D1D]'
+                  }`}
+                >
+                  <option value="">Sem pilar definido</option>
+                  {isCycleWithoutPillars ? (
+                    <option value="" disabled>
+                      Ciclo sem pilares configurados
+                    </option>
+                  ) : availablePillars.length > 0 ? (
+                    availablePillars.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>
+                      Nenhum pilar disponível
+                    </option>
+                  )}
+                </select>
+                {isCycleWithoutPillars && (
+                  <p className="text-[10px] text-amber-700 mt-1">
+                    Este ciclo ainda não possui pilares configurados.
+                  </p>
+                )}
               </div>
 
+              {/* 3. Campanha */}
+              <div>
+                <label className="block text-xs font-semibold text-[#666668] mb-1.5">
+                  Campanha
+                </label>
+                <select
+                  value={campaignId}
+                  onChange={(e) => setCampaignId(e.target.value)}
+                  disabled={!clientId || planningLoading}
+                  className="w-full px-3 py-2 text-xs font-medium text-[#1D1D1D] bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg focus:outline-none focus:bg-white focus:border-[#1D1D1D] cursor-pointer disabled:opacity-50"
+                >
+                  <option value="">Sem campanha definida</option>
+                  {activeCampaigns.length > 0 ? (
+                    activeCampaigns.map((camp) => (
+                      <option key={camp.id} value={camp.id}>
+                        {camp.name} {camp.status === 'draft' ? '(Rascunho)' : ''}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>
+                      Nenhuma campanha ativa disponível
+                    </option>
+                  )}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Estratégia Editorial & Metas */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-[#1D1D1D] uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-[#F2F3F3]">
+              <Sparkles className="w-3.5 h-3.5 text-[#F15A3C]" />
+              <span>Estratégia & Metas</span>
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Etapa do Funil */}
               <div>
                 <label className="block text-xs font-semibold text-[#666668] mb-1.5">
@@ -305,7 +508,7 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
             </div>
           </div>
 
-          {/* Section 3: Redação & Criação */}
+          {/* Section 4: Redação & Criação */}
           <div className="space-y-4">
             <div className="flex items-center justify-between pb-1 border-b border-[#F2F3F3]">
               <h3 className="text-xs font-bold text-[#1D1D1D] uppercase tracking-wider flex items-center gap-1.5">
@@ -349,11 +552,11 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
             </div>
           </div>
 
-          {/* Section 4: Operação & Planejamento */}
+          {/* Section 5: Operação & Agendamento */}
           <div className="space-y-4">
             <h3 className="text-xs font-bold text-[#1D1D1D] uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-[#F2F3F3]">
               <Calendar className="w-3.5 h-3.5 text-[#F15A3C]" />
-              <span>Planejamento & Operação</span>
+              <span>Operação & Agendamento</span>
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -442,8 +645,8 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isSaving}
-            className="inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-[#F15A3C] hover:bg-[#d94a2e] rounded-lg transition-all cursor-pointer shadow-2xs active:scale-[0.98] disabled:opacity-50"
+            disabled={isSaving || isPillarIncompatible}
+            className="inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-[#F15A3C] hover:bg-[#d94a2e] rounded-lg transition-all cursor-pointer shadow-2xs active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? (
               <>
