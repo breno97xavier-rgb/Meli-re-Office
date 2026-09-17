@@ -1,19 +1,15 @@
-import React, { useState } from 'react';
-import {
-  Image as ImageIcon,
-  Video,
-  Layers,
-  Film,
-  Smartphone,
-  ChevronLeft,
-  ChevronRight,
-  Maximize2,
-  FileText,
-} from 'lucide-react';
+import React from 'react';
+import { HelpCircle, Maximize2, FileText } from 'lucide-react';
 import { PresentationItem } from '../../../types/presentations';
 import { Client } from '../../../types/clients';
+import {
+  InstagramFeedMockup,
+  InstagramCarouselMockup,
+  InstagramReelsMockup,
+  InstagramStoryMockup,
+} from './mockups';
 
-interface PresentationMediaStageProps {
+export interface PresentationMediaStageProps {
   item: PresentationItem;
   client?: Client | null;
   signedUrls: Record<string, string>;
@@ -27,196 +23,130 @@ export const PresentationMediaStage: React.FC<PresentationMediaStageProps> = ({
   onExpand,
 }) => {
   const content = item.content;
-  const format = content?.format || 'feed_single';
-  const rawAssets = item.assets || [];
+  const rawFormat = (content?.format || '').toLowerCase().trim();
 
-  // Filter valid displayable assets sorted by display_order
-  const displayableAssets = [...rawAssets]
-    .filter((a) => a.is_current !== false && (a.asset_type === 'image' || a.asset_type === 'video'))
-    .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+  // Route to the appropriate mockup component based on content format
+  switch (rawFormat) {
+    case 'feed_single':
+    case 'static':
+      return (
+        <InstagramFeedMockup
+          item={item}
+          client={client}
+          signedUrls={signedUrls}
+          onExpand={onExpand}
+        />
+      );
 
-  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+    case 'carousel':
+      return (
+        <InstagramCarouselMockup
+          item={item}
+          client={client}
+          signedUrls={signedUrls}
+          onExpand={onExpand}
+        />
+      );
 
-  // Aspect ratio class based on format
-  const isVertical = format === 'reels' || format === 'story';
-  const isSquare = false;
+    case 'reels':
+      return (
+        <InstagramReelsMockup
+          item={item}
+          client={client}
+          signedUrls={signedUrls}
+          onExpand={onExpand}
+        />
+      );
 
-  const aspectClass = isVertical
-    ? 'aspect-[9/16] max-w-[340px]'
-    : isSquare
-    ? 'aspect-square max-w-[440px]'
-    : 'aspect-[4/5] max-w-[440px]';
+    case 'story':
+      return (
+        <InstagramStoryMockup
+          item={item}
+          client={client}
+          signedUrls={signedUrls}
+          onExpand={onExpand}
+        />
+      );
 
-  // Carousel slide handling
-  const safeIndex = Math.min(
-    Math.max(0, activeSlideIndex),
-    Math.max(0, displayableAssets.length - 1)
-  );
-  const currentAsset = displayableAssets[safeIndex] || displayableAssets[0];
-  const isVideo =
-    currentAsset?.asset_type === 'video' || currentAsset?.mime_type?.startsWith('video/');
-  const currentMediaUrl = currentAsset?.file_url ? signedUrls[currentAsset.file_url] : null;
+    default: {
+      // Fallback neutro para formatos não suportados / não reconhecidos
+      const assets = item.assets || [];
+      const primaryAsset =
+        assets.find((a) => a.is_current && (a.asset_type === 'image' || a.asset_type === 'video')) ||
+        assets.find((a) => a.asset_type === 'image' || a.asset_type === 'video') ||
+        assets[0];
 
-  const clientName = client?.commercial_name || client?.name || 'Cliente';
+      const resolvedUrl = primaryAsset?.file_url ? signedUrls[primaryAsset.file_url] : null;
+      const isVideo =
+        primaryAsset?.asset_type === 'video' ||
+        primaryAsset?.mime_type?.startsWith('video/');
 
-  const handlePrevSlide = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveSlideIndex((prev) => Math.max(0, prev - 1));
-  };
-
-  const handleNextSlide = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveSlideIndex((prev) => Math.min(displayableAssets.length - 1, prev + 1));
-  };
-
-  const getFormatIcon = () => {
-    switch (format) {
-      case 'carousel':
-        return <Layers className="w-5 h-5 text-[#F15A3C]" />;
-      case 'reels':
-        return <Film className="w-5 h-5 text-[#F15A3C]" />;
-      case 'story':
-        return <Smartphone className="w-5 h-5 text-[#F15A3C]" />;
-      case 'feed_single':
-      default:
-        return <FileText className="w-5 h-5 text-[#F15A3C]" />;
-    }
-  };
-
-  return (
-    <div className={`w-full ${aspectClass} mx-auto relative group select-none transition-all`}>
-      {/* Outer Card Container */}
-      <div className="w-full h-full bg-[#111113] rounded-3xl border border-[#2A2A2E] shadow-2xl overflow-hidden flex flex-col relative">
-        {/* Top Floating Stage Header (Client tag & Expand action) */}
-        <div className="absolute top-0 inset-x-0 z-20 p-3.5 flex items-center justify-between bg-gradient-to-b from-black/80 via-black/40 to-transparent pointer-events-none">
-          <div className="flex items-center gap-2 pointer-events-auto">
-            {client?.logo_url ? (
-              <img
-                src={client.logo_url}
-                alt={clientName}
-                className="w-6 h-6 rounded-full object-cover border border-white/20"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="w-6 h-6 rounded-full bg-[#2A2A2E] text-white text-[10px] font-bold flex items-center justify-center border border-white/10">
-                {clientName.slice(0, 1).toUpperCase()}
-              </div>
-            )}
-            <span className="text-xs font-semibold text-white/90 drop-shadow-sm truncate max-w-[140px]">
-              {clientName}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5 pointer-events-auto">
-            {displayableAssets.length > 1 && format === 'carousel' && (
-              <span className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-bold tracking-wider flex items-center gap-1 border border-white/10">
-                <Layers className="w-3 h-3 text-[#F15A3C]" />
-                <span>
-                  {safeIndex + 1} / {displayableAssets.length}
-                </span>
+      return (
+        <div className="w-full max-w-[420px] mx-auto bg-[#141416] rounded-2xl border border-[#2A2A2E] shadow-xl overflow-hidden flex flex-col select-none">
+          {/* Top Neutral Header */}
+          <div className="px-4 py-3 bg-[#1C1C1F] border-b border-[#2A2A2E] flex items-center justify-between">
+            <div className="flex items-center gap-2 text-[#9E9EA0]">
+              <HelpCircle className="w-4 h-4 text-[#F15A3C]" />
+              <span className="text-xs font-semibold text-white">
+                {content?.format ? `Formato: ${content.format}` : 'Formato Não Identificado'}
               </span>
-            )}
+            </div>
 
-            {onExpand && currentMediaUrl && (
+            {onExpand && resolvedUrl && (
               <button
                 type="button"
-                onClick={onExpand}
-                className="p-1.5 rounded-full bg-black/60 hover:bg-black/85 text-white/90 hover:text-white backdrop-blur-md border border-white/10 transition-all cursor-pointer hover:scale-105"
-                title="Visualização ampliada"
-                aria-label="Visualização ampliada"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onExpand();
+                }}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold text-white/80 hover:text-white bg-black/40 hover:bg-black/60 transition-all cursor-pointer border border-white/10"
               >
-                <Maximize2 className="w-3.5 h-3.5" />
+                <Maximize2 className="w-3 h-3 text-[#F15A3C]" />
+                <span>Ampliar</span>
               </button>
             )}
           </div>
-        </div>
 
-        {/* Media Canvas */}
-        <div className="flex-1 w-full h-full relative flex items-center justify-center bg-[#0D0D0E] overflow-hidden">
-          {currentMediaUrl ? (
-            isVideo ? (
-              <video
-                key={currentAsset?.id || safeIndex}
-                src={currentMediaUrl}
-                controls
-                playsInline
-                className="w-full h-full object-contain"
-              />
+          {/* Media or Neutral Notice Area */}
+          <div className="relative w-full aspect-[4/5] bg-[#0D0D0E] flex items-center justify-center p-4">
+            {resolvedUrl ? (
+              isVideo ? (
+                <video
+                  src={resolvedUrl}
+                  controls
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <img
+                  src={resolvedUrl}
+                  alt={content?.internal_title || 'Mídia da Peça'}
+                  className="w-full h-full object-contain select-none"
+                  referrerPolicy="no-referrer"
+                />
+              )
             ) : (
-              <img
-                key={currentAsset?.id || safeIndex}
-                src={currentMediaUrl}
-                alt={currentAsset?.file_name || content?.internal_title || 'Mídia da publicação'}
-                className="w-full h-full object-contain select-none"
-                loading="lazy"
-                referrerPolicy="no-referrer"
-              />
-            )
-          ) : (
-            /* Elegant Branded Placeholder when no asset is uploaded */
-            <div className="flex flex-col items-center justify-center p-8 text-center text-[#8C8D8F] space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-[#1D1D20] border border-[#2E2E32] flex items-center justify-center shadow-inner">
-                {getFormatIcon()}
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-bold text-white tracking-wide">
-                  Mídia em Produção
+              <div className="flex flex-col items-center justify-center text-center p-6 text-[#9E9EA0]">
+                <div className="w-12 h-12 rounded-2xl bg-[#1F1F23] flex items-center justify-center mb-3 text-[#F15A3C] shadow-inner">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <p className="text-xs font-semibold text-white tracking-wide">
+                  Formato de conteúdo não suportado para pré-visualização.
                 </p>
-                <p className="text-[11px] text-[#8C8D8F] max-w-[200px] leading-relaxed">
-                  Os arquivos visuais desta peça estão em etapa de finalização pela equipe.
+                <p className="text-[11px] text-[#7E7E80] mt-1.5 max-w-[240px] leading-relaxed">
+                  Não foi possível identificar um mockup de rede social compatível para este formato.
                 </p>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Carousel Navigation Arrows */}
-          {displayableAssets.length > 1 && format === 'carousel' && (
-            <>
-              {safeIndex > 0 && (
-                <button
-                  type="button"
-                  onClick={handlePrevSlide}
-                  aria-label="Lâmina anterior"
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/65 hover:bg-black/90 text-white flex items-center justify-center transition-all backdrop-blur-md border border-white/10 shadow-xl cursor-pointer hover:scale-105 active:scale-95 z-20"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-              )}
-
-              {safeIndex < displayableAssets.length - 1 && (
-                <button
-                  type="button"
-                  onClick={handleNextSlide}
-                  aria-label="Próxima lâmina"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/65 hover:bg-black/90 text-white flex items-center justify-center transition-all backdrop-blur-md border border-white/10 shadow-xl cursor-pointer hover:scale-105 active:scale-95 z-20"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              )}
-
-              {/* Dots / Bullets bar at bottom */}
-              <div className="absolute bottom-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 z-20">
-                {displayableAssets.map((_, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveSlideIndex(idx);
-                    }}
-                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                      idx === safeIndex
-                        ? 'w-4 bg-[#F15A3C]'
-                        : 'w-1.5 bg-white/50 hover:bg-white/80'
-                    }`}
-                    aria-label={`Ir para lâmina ${idx + 1}`}
-                  />
-                ))}
-              </div>
-            </>
-          )}
+          {/* Bottom Neutral Notice */}
+          <div className="px-4 py-2.5 bg-[#1C1C1F] border-t border-[#2A2A2E] text-center">
+            <span className="text-[11px] text-[#9E9EA0]">
+              Formato de conteúdo não suportado para pré-visualização.
+            </span>
+          </div>
         </div>
-      </div>
-    </div>
-  );
+      );
+    }
+  }
 };

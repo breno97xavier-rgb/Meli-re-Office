@@ -61,6 +61,40 @@ export function usePublicPresentation(token: string | null | undefined) {
     loadPresentation();
   }, [loadPresentation]);
 
+  const updateItemDecision = useCallback(
+    (response: {
+      item_id: string;
+      client_approval_status: string;
+      client_feedback: string | null;
+      reviewed_at: string;
+      presentation_id: string;
+      presentation_status: string;
+    }) => {
+      setData((prev) => {
+        if (!prev) return prev;
+
+        const updatedItems = (prev.items || []).map((it) => {
+          if (it.id === response.item_id) {
+            return {
+              ...it,
+              client_approval_status: response.client_approval_status,
+              client_feedback: response.client_feedback,
+              reviewed_at: response.reviewed_at,
+            };
+          }
+          return it;
+        });
+
+        return {
+          ...prev,
+          status: response.presentation_status || prev.status,
+          items: updatedItems,
+        };
+      });
+    },
+    []
+  );
+
   return {
     data,
     signedUrls,
@@ -68,5 +102,6 @@ export function usePublicPresentation(token: string | null | undefined) {
     assetsResolving,
     error,
     reload: loadPresentation,
+    updateItemDecision,
   };
 }

@@ -152,6 +152,27 @@ export const ITEM_APPROVAL_STATUS_CONFIG: Record<string, StatusConfig> = {
     border: 'border-amber-200',
     icon: AlertTriangle,
   },
+  adjustments_requested: {
+    label: 'Ajustes Solicitados',
+    bg: 'bg-amber-50',
+    text: 'text-amber-800',
+    border: 'border-amber-200',
+    icon: AlertTriangle,
+  },
+  requested_changes: {
+    label: 'Ajustes Solicitados',
+    bg: 'bg-amber-50',
+    text: 'text-amber-800',
+    border: 'border-amber-200',
+    icon: AlertTriangle,
+  },
+  needs_changes: {
+    label: 'Ajustes Solicitados',
+    bg: 'bg-amber-50',
+    text: 'text-amber-800',
+    border: 'border-amber-200',
+    icon: AlertTriangle,
+  },
   rejected: {
     label: 'Recusado',
     bg: 'bg-rose-50',

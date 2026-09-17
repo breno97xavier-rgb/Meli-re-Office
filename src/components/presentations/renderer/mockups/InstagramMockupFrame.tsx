@@ -2,7 +2,7 @@ import React from 'react';
 import { MoreHorizontal, Heart, MessageCircle, Send, Bookmark, Maximize2 } from 'lucide-react';
 import { Client } from '../../../../types/clients';
 
-interface InstagramMockupFrameProps {
+export interface InstagramMockupFrameProps {
   client?: Client | null;
   children: React.ReactNode;
   aspectRatio?: 'square' | 'portrait' | 'story' | 'reels';
@@ -31,7 +31,7 @@ export const InstagramMockupFrame: React.FC<InstagramMockupFrameProps> = ({
 
   return (
     <div className="w-full max-w-[420px] mx-auto bg-white rounded-2xl border border-[#E8E9EA] shadow-xl overflow-hidden flex flex-col select-none transition-all">
-      {/* Header */}
+      {/* Top Profile Header */}
       <div className="flex items-center justify-between px-3.5 py-2.5 bg-white border-b border-[#F2F3F3]">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-full bg-[#1D1D1D] text-white flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden ring-1 ring-[#F15A3C]/40">
@@ -47,14 +47,8 @@ export const InstagramMockupFrame: React.FC<InstagramMockupFrameProps> = ({
             )}
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-1">
-              <span className="text-xs font-bold text-[#1D1D1D] truncate leading-none">
-                {handle || 'cliente'}
-              </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-[#F15A3C]" />
-            </div>
-            <span className="text-[10px] text-[#9E9EA0] truncate block mt-0.5">
-              Publicação Oficial
+            <span className="text-xs font-bold text-[#1D1D1D] truncate block leading-tight">
+              {handle || 'cliente'}
             </span>
           </div>
         </div>
@@ -80,13 +74,13 @@ export const InstagramMockupFrame: React.FC<InstagramMockupFrameProps> = ({
       </div>
 
       {/* Media Canvas (4:5 Default for Feed/Carousel) */}
-      <div className={`relative w-full ${aspectClass} bg-[#111111] overflow-hidden flex items-center justify-center`}>
+      <div className={`relative w-full ${aspectClass} bg-[#0D0D0E] overflow-hidden flex items-center justify-center`}>
         {children}
       </div>
 
       {/* Action Bar (Feed / Carousel) */}
       {showInteractions && (
-        <div className="p-3 bg-white space-y-2">
+        <div className="p-3 bg-white space-y-2 border-t border-[#F2F3F3]">
           <div className="flex items-center justify-between text-[#1D1D1D]">
             <div className="flex items-center gap-3.5">
               <Heart className="w-5 h-5 text-[#1D1D1D] hover:text-[#F15A3C] transition-colors cursor-default" />
@@ -100,7 +94,7 @@ export const InstagramMockupFrame: React.FC<InstagramMockupFrameProps> = ({
           {captionPreview && (
             <div className="text-xs text-[#1D1D1D] leading-snug">
               <span className="font-bold mr-1.5">{handle || 'cliente'}</span>
-              <span className="text-[#444446] line-clamp-2">{captionPreview}</span>
+              <span className="text-[#555557] line-clamp-2">{captionPreview}</span>
             </div>
           )}
         </div>

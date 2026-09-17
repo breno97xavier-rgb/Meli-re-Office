@@ -26,6 +26,12 @@ export function formatPresentationError(error: unknown): string {
     hint: errObj.hint,
   });
 
+  if (lowerMsg.includes('already_has_next_round')) {
+    return 'Já existe uma próxima rodada gerada para esta apresentação.';
+  }
+  if (lowerMsg.includes('source_presentation_not_found') || lowerMsg.includes('invalid_source_presentation')) {
+    return 'Apresentação de origem não encontrada ou inválida.';
+  }
   if (lowerMsg.includes('unique constraint') || lowerMsg.includes('presentation_items_presentation_id_content_id_key') || lowerMsg.includes('duplicate key')) {
     return 'Este conteúdo já foi adicionado a esta apresentação.';
   }
@@ -86,6 +92,8 @@ export async function fetchPresentations(clientId?: string): Promise<Presentatio
         description,
         status,
         round_number,
+        presentation_series_id,
+        previous_presentation_id,
         sent_at,
         created_by,
         created_at,
@@ -140,7 +148,7 @@ export async function fetchPresentations(clientId?: string): Promise<Presentatio
 }
 
 /**
- * Fetches a single presentation by its ID with client relation.
+ * Fetches a single presentation by its ID with client relation and series lineage.
  */
 export async function fetchPresentationById(presentationId: string): Promise<Presentation | null> {
   if (!presentationId) return null;
@@ -155,6 +163,8 @@ export async function fetchPresentationById(presentationId: string): Promise<Pre
         description,
         status,
         round_number,
+        presentation_series_id,
+        previous_presentation_id,
         sent_at,
         created_by,
         created_at,
@@ -176,7 +186,64 @@ export async function fetchPresentationById(presentationId: string): Promise<Pre
       throw new Error(formatPresentationError(error));
     }
 
-    return normalizePresentation(data);
+    const pres = normalizePresentation(data);
+
+    // Fetch series rounds if presentation_series_id exists (or using id as series)
+    const seriesId = pres.presentation_series_id || pres.id;
+    try {
+      const { data: seriesData } = await supabase
+        .from('presentations')
+        .select('id, round_number, title, status, created_at, previous_presentation_id')
+        .or(`presentation_series_id.eq.${seriesId},id.eq.${seriesId}`)
+        .order('round_number', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (seriesData && seriesData.length > 0) {
+        pres.series_rounds = seriesData.map((s) => ({
+          id: s.id,
+          round_number: s.round_number || 1,
+          title: s.title,
+          status: s.status,
+          created_at: s.created_at,
+        }));
+
+        // Resolve previous presentation and next presentation in the lineage
+        const currentIndex = seriesData.findIndex((s) => s.id === pres.id);
+        if (currentIndex > 0) {
+          const prev = seriesData[currentIndex - 1];
+          pres.previous_presentation = {
+            id: prev.id,
+            title: prev.title,
+            round_number: prev.round_number || 1,
+            status: prev.status,
+          };
+        } else if (pres.previous_presentation_id) {
+          const prev = seriesData.find((s) => s.id === pres.previous_presentation_id);
+          if (prev) {
+            pres.previous_presentation = {
+              id: prev.id,
+              title: prev.title,
+              round_number: prev.round_number || 1,
+              status: prev.status,
+            };
+          }
+        }
+
+        if (currentIndex >= 0 && currentIndex < seriesData.length - 1) {
+          const next = seriesData[currentIndex + 1];
+          pres.next_presentation = {
+            id: next.id,
+            title: next.title,
+            round_number: next.round_number || 1,
+            status: next.status,
+          };
+        }
+      }
+    } catch (seriesErr) {
+      console.warn('Could not load series rounds lineage:', seriesErr);
+    }
+
+    return pres;
   } catch (err: unknown) {
     console.error('fetchPresentationById exception:', err);
     throw new Error(formatPresentationError(err));
@@ -343,6 +410,9 @@ export async function fetchPresentationItems(presentationId: string): Promise<Pr
           published_at,
           approved_at,
           notes,
+          editorial_plan_id,
+          pillar_id,
+          campaign_id,
           created_at,
           updated_at,
           client:clients(
@@ -480,6 +550,9 @@ export async function addContentToPresentation(
         published_at,
         approved_at,
         notes,
+        editorial_plan_id,
+        pillar_id,
+        campaign_id,
         created_at,
         updated_at,
         client:clients(
@@ -592,55 +665,97 @@ export async function updatePresentationItem(
     payload.reviewed_at = input.reviewed_at;
   }
 
-  const { data, error } = await supabase
-    .from('presentation_items')
-    .update(payload)
-    .eq('id', itemId)
-    .select(`
+  const itemSelectQuery = `
+    id,
+    presentation_id,
+    content_id,
+    display_order,
+    presentation_notes,
+    client_approval_status,
+    client_feedback,
+    reviewed_at,
+    created_at,
+    content:contents(
       id,
-      presentation_id,
-      content_id,
-      display_order,
-      presentation_notes,
-      client_approval_status,
-      client_feedback,
-      reviewed_at,
+      client_id,
+      internal_title,
+      format,
+      primary_channel,
+      goal,
+      pillar,
+      funnel_stage,
+      copy,
+      script,
+      caption,
+      visual_copy,
+      editorial_status,
+      planned_date,
+      scheduled_date,
+      published_at,
+      approved_at,
+      notes,
+      editorial_plan_id,
+      pillar_id,
+      campaign_id,
       created_at,
-      content:contents(
+      updated_at,
+      client:clients(
         id,
-        client_id,
-        internal_title,
-        format,
-        primary_channel,
-        goal,
-        pillar,
-        funnel_stage,
-        copy,
-        script,
-        caption,
-        visual_copy,
-        editorial_status,
-        planned_date,
-        scheduled_date,
-        published_at,
-        approved_at,
-        notes,
-        created_at,
-        updated_at,
-        client:clients(
-          id,
-          name,
-          commercial_name,
-          logo_url,
-          status
-        )
+        name,
+        commercial_name,
+        logo_url,
+        status
       )
-    `)
-    .single();
+    )
+  `;
 
-  if (error) {
-    console.error('Error updating presentation item:', error);
-    throw new Error(formatPresentationError(error));
+  let data: any = null;
+  let error: any = null;
+
+  // Se estiver atualizando status de aprovação, invocar obrigatoriamente a RPC administrativa para sincronização universal
+  if (input.client_approval_status !== undefined) {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('update_presentation_item_admin_decision', {
+      p_item_id: itemId,
+      p_status: input.client_approval_status,
+      p_feedback: input.client_feedback !== undefined ? input.client_feedback : null,
+      p_presentation_notes: input.presentation_notes !== undefined ? input.presentation_notes : null,
+      p_update_notes: input.presentation_notes !== undefined,
+    });
+
+    if (rpcError) {
+      console.error('[presentationsService] Error in update_presentation_item_admin_decision:', rpcError);
+      throw new Error(formatPresentationError(rpcError));
+    }
+
+    // Reconciliação executada com sucesso na RPC, busca o item completo populado com suas relações
+    const { data: fetchedItem, error: fetchErr } = await supabase
+      .from('presentation_items')
+      .select(itemSelectQuery)
+      .eq('id', itemId)
+      .single();
+
+    if (fetchErr || !fetchedItem) {
+      console.error('[presentationsService] Error fetching item after RPC reconciliation:', fetchErr);
+      throw new Error(formatPresentationError(fetchErr || new Error('Item não encontrado após atualização.')));
+    }
+
+    data = fetchedItem;
+  } else {
+    // Atualização direta apenas para outros campos puramente administrativos (ex: ordenação, notas avulsas)
+    const updateRes = await supabase
+      .from('presentation_items')
+      .update(payload)
+      .eq('id', itemId)
+      .select(itemSelectQuery)
+      .single();
+
+    data = updateRes.data;
+    error = updateRes.error;
+
+    if (error) {
+      console.error('Error updating presentation item:', error);
+      throw new Error(formatPresentationError(error));
+    }
   }
 
   const resolvedContent = normalizeResolvedContent(data.content);
@@ -694,3 +809,40 @@ export async function reorderPresentationItems(
     throw new Error(formatPresentationError(failed.error));
   }
 }
+
+/**
+ * Creates the next presentation round using the transactional RPC create_next_presentation_round.
+ * Preserves the source round history and links lineage via presentation_series_id.
+ */
+export async function createNextPresentationRound(
+  sourcePresentationId: string,
+  contentIds: string[] = [],
+  customTitle?: string
+): Promise<{ presentation: Presentation; items_count: number }> {
+  if (!sourcePresentationId) {
+    throw new Error('ID da apresentação de origem não informado.');
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('create_next_presentation_round', {
+      p_source_presentation_id: sourcePresentationId,
+      p_content_ids: contentIds,
+      p_custom_title: customTitle?.trim() || null,
+    });
+
+    if (error) {
+      console.error('[presentationsService] Error calling create_next_presentation_round:', error);
+      throw new Error(formatPresentationError(error));
+    }
+
+    const res = data as { success: boolean; presentation: Presentation; items_count: number };
+    return {
+      presentation: normalizePresentation(res.presentation),
+      items_count: res.items_count || 0,
+    };
+  } catch (err: unknown) {
+    console.error('createNextPresentationRound exception:', err);
+    throw new Error(formatPresentationError(err));
+  }
+}
+

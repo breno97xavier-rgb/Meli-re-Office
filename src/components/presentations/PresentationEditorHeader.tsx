@@ -8,6 +8,10 @@ import {
   RefreshCw,
   Share2,
   Play,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  GitCommit,
 } from 'lucide-react';
 import { Presentation } from '../../types/presentations';
 import { PresentationStatusBadge } from './PresentationStatusBadge';
@@ -21,6 +25,8 @@ interface PresentationEditorHeaderProps {
   onOpenAddContents: () => void;
   onOpenEditMetadata: () => void;
   onOpenShare: () => void;
+  onOpenNextRoundModal: () => void;
+  onNavigateToRound?: (targetPresentationId: string) => void;
   onRefresh: () => void;
 }
 
@@ -33,12 +39,18 @@ export const PresentationEditorHeader: React.FC<PresentationEditorHeaderProps> =
   onOpenAddContents,
   onOpenEditMetadata,
   onOpenShare,
+  onOpenNextRoundModal,
+  onNavigateToRound,
   onRefresh,
 }) => {
   const clientName =
     presentation.client?.commercial_name ||
     presentation.client?.name ||
     'Cliente';
+
+  const seriesRounds = presentation.series_rounds || [];
+  const currentRoundNumber = presentation.round_number || 1;
+  const totalRounds = Math.max(seriesRounds.length, currentRoundNumber);
 
   return (
     <div className="bg-white border border-[#E8E9EA] rounded-2xl p-5 shadow-2xs space-y-4">
@@ -56,7 +68,7 @@ export const PresentationEditorHeader: React.FC<PresentationEditorHeaderProps> =
           </button>
 
           <div className="space-y-1">
-            {/* Client Badge */}
+            {/* Client Badge & Round Info */}
             <div className="flex items-center gap-2 flex-wrap">
               <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#FAFAFA] border border-[#E8E9EA] rounded-lg text-xs font-semibold text-[#1D1D1D]">
                 {presentation.client?.logo_url ? (
@@ -71,8 +83,10 @@ export const PresentationEditorHeader: React.FC<PresentationEditorHeaderProps> =
                 <span>{clientName}</span>
               </div>
 
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#F7F7F8] text-[#555557] border border-[#E8E9EA]">
-                Rodada {presentation.round_number || 1}
+              {/* Round Indicator with Series Count */}
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#FDF1EE] text-[#F15A3C] border border-[#F15A3C]/20">
+                <span>Rodada {currentRoundNumber}</span>
+                {totalRounds > 1 && <span className="text-[#F15A3C]/70">de {totalRounds}</span>}
               </span>
 
               <PresentationStatusBadge status={presentation.status} size="sm" />
@@ -104,6 +118,17 @@ export const PresentationEditorHeader: React.FC<PresentationEditorHeaderProps> =
             <span>Atualizar</span>
           </button>
 
+          {/* Gerar Próxima Rodada Button */}
+          <button
+            type="button"
+            onClick={onOpenNextRoundModal}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#1D1D1D] bg-[#F7F7F8] hover:bg-[#FDF1EE] hover:text-[#F15A3C] hover:border-[#F15A3C]/30 border border-[#E8E9EA] rounded-xl transition-all cursor-pointer shadow-2xs"
+            title="Gerar próxima rodada desta apresentação"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-[#F15A3C]" />
+            <span>Nova Rodada</span>
+          </button>
+
           <button
             type="button"
             onClick={onPresent}
@@ -117,10 +142,10 @@ export const PresentationEditorHeader: React.FC<PresentationEditorHeaderProps> =
           <button
             type="button"
             onClick={onOpenShare}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#1D1D1D] bg-[#F7F7F8] hover:bg-[#FDF1EE] hover:text-[#F15A3C] hover:border-[#F15A3C]/30 border border-[#E8E9EA] rounded-xl transition-all cursor-pointer shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#1D1D1D] bg-[#F7F7F8] hover:bg-[#EDEEEE] border border-[#E8E9EA] rounded-xl transition-all cursor-pointer shadow-2xs"
             title="Gerenciar link de acesso do cliente"
           >
-            <Share2 className="w-3.5 h-3.5 text-[#F15A3C]" />
+            <Share2 className="w-3.5 h-3.5 text-[#666668]" />
             <span>Compartilhar</span>
           </button>
 
@@ -144,6 +169,64 @@ export const PresentationEditorHeader: React.FC<PresentationEditorHeaderProps> =
         </div>
       </div>
 
+      {/* Series Lineage Navigation (if multiple rounds exist) */}
+      {seriesRounds.length > 1 && onNavigateToRound && (
+        <div className="flex items-center justify-between p-2.5 bg-[#FAFAFA] border border-[#E8E9EA] rounded-xl text-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-[#666668] font-semibold flex items-center gap-1">
+              <GitCommit className="w-3.5 h-3.5 text-[#F15A3C]" />
+              <span>Sequência de Rodadas:</span>
+            </span>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {seriesRounds.map((r) => {
+                const isCurrent = r.id === presentation.id;
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => !isCurrent && onNavigateToRound(r.id)}
+                    disabled={isCurrent}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      isCurrent
+                        ? 'bg-[#1D1D1D] text-white shadow-2xs cursor-default'
+                        : 'bg-white border border-[#E8E9EA] text-[#666668] hover:text-[#1D1D1D] hover:bg-[#F2F3F3]'
+                    }`}
+                  >
+                    R{r.round_number}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {presentation.previous_presentation && (
+              <button
+                type="button"
+                onClick={() => onNavigateToRound(presentation.previous_presentation!.id)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-[#666668] hover:text-[#1D1D1D] bg-white border border-[#E8E9EA] hover:bg-[#F2F3F3] rounded-lg transition-colors cursor-pointer"
+                title={`Ir para a Rodada ${presentation.previous_presentation.round_number}`}
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Rodada {presentation.previous_presentation.round_number}</span>
+              </button>
+            )}
+
+            {presentation.next_presentation && (
+              <button
+                type="button"
+                onClick={() => onNavigateToRound(presentation.next_presentation!.id)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-[#F15A3C] hover:bg-[#FDF1EE] bg-white border border-[#F15A3C]/30 rounded-lg transition-colors cursor-pointer"
+                title={`Ir para a Rodada ${presentation.next_presentation.round_number}`}
+              >
+                <span>Rodada {presentation.next_presentation.round_number}</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Bottom info summary */}
       <div className="flex items-center justify-between text-xs text-[#666668] pt-3 border-t border-[#F2F3F3]">
@@ -163,3 +246,4 @@ export const PresentationEditorHeader: React.FC<PresentationEditorHeaderProps> =
     </div>
   );
 };
+

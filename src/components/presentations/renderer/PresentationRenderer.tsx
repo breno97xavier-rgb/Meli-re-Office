@@ -11,6 +11,12 @@ export interface PresentationRendererProps {
   client?: Client | null;
   signedUrls: Record<string, string>;
   mode?: 'internal' | 'public';
+  submittingDecision?: boolean;
+  onSubmitDecision?: (
+    itemId: string,
+    status: 'approved' | 'changes_requested' | 'rejected',
+    feedback?: string | null
+  ) => Promise<void>;
   onExit?: () => void;
 }
 
@@ -20,6 +26,8 @@ export const PresentationRenderer: React.FC<PresentationRendererProps> = ({
   client,
   signedUrls,
   mode = 'internal',
+  submittingDecision = false,
+  onSubmitDecision,
   onExit,
 }) => {
   const [currentSlideIndex, setCurrentSlideIndex] = useState<number>(0);
@@ -153,6 +161,13 @@ export const PresentationRenderer: React.FC<PresentationRendererProps> = ({
             signedUrls={signedUrls}
             slideNumber={currentSlideIndex}
             totalSlides={totalContentSlides}
+            mode={mode}
+            submittingDecision={submittingDecision}
+            onSubmitDecision={
+              onSubmitDecision
+                ? (status, feedback) => onSubmitDecision(currentItem.id, status, feedback)
+                : undefined
+            }
             onLightboxChange={setIsLightboxActive}
           />
         ) : null}

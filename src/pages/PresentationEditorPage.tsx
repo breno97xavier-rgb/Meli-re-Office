@@ -7,6 +7,7 @@ import { PresentationItemCard } from '../components/presentations/PresentationIt
 import { AddContentsToPresentationModal } from '../components/presentations/AddContentsToPresentationModal';
 import { EditPresentationModal } from '../components/presentations/EditPresentationModal';
 import { SharePresentationModal } from '../components/presentations/SharePresentationModal';
+import { CreateNextRoundModal } from '../components/presentations/CreateNextRoundModal';
 import {
   Layers,
   Plus,
@@ -28,6 +29,7 @@ export const PresentationEditorPage: React.FC<PresentationEditorPageProps> = ({
     items,
     signedUrls,
     availableContents,
+    clientContents,
     loading,
     error,
     actionLoading,
@@ -45,9 +47,21 @@ export const PresentationEditorPage: React.FC<PresentationEditorPageProps> = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isNextRoundModalOpen, setIsNextRoundModalOpen] = useState(false);
 
   const handleBack = () => {
     navigate('/apresentacoes');
+  };
+
+  const handleNavigateToRound = (targetId: string) => {
+    if (targetId && targetId !== presentationId) {
+      navigate(`/apresentacoes/${targetId}` as RoutePath);
+    }
+  };
+
+  const handleNextRoundSuccess = (newPresentationId: string) => {
+    setIsNextRoundModalOpen(false);
+    navigate(`/apresentacoes/${newPresentationId}` as RoutePath);
   };
 
   if (loading && !presentation) {
@@ -104,6 +118,8 @@ export const PresentationEditorPage: React.FC<PresentationEditorPageProps> = ({
         onOpenAddContents={() => setIsAddModalOpen(true)}
         onOpenEditMetadata={() => setIsEditModalOpen(true)}
         onOpenShare={() => setIsShareModalOpen(true)}
+        onOpenNextRoundModal={() => setIsNextRoundModalOpen(true)}
+        onNavigateToRound={handleNavigateToRound}
         onRefresh={loadData}
       />
 
@@ -173,6 +189,18 @@ export const PresentationEditorPage: React.FC<PresentationEditorPageProps> = ({
         onSave={handleUpdatePresentation}
         isSaving={isUpdatingPresentation}
       />
+
+      {/* Modal: Create Next Round */}
+      {isNextRoundModalOpen && (
+        <CreateNextRoundModal
+          isOpen={isNextRoundModalOpen}
+          presentation={presentation}
+          currentItems={items}
+          availableClientContents={clientContents}
+          onClose={() => setIsNextRoundModalOpen(false)}
+          onSuccess={handleNextRoundSuccess}
+        />
+      )}
 
       {/* Modal: Share Presentation / Access Link Management */}
       {isShareModalOpen && (

@@ -27,6 +27,14 @@ export interface PresentationClientRelation {
   status?: string;
 }
 
+export interface PresentationSeriesRound {
+  id: string;
+  round_number: number;
+  title: string;
+  status: PresentationStatus;
+  created_at: string;
+}
+
 export interface Presentation {
   id: string;
   client_id: string;
@@ -34,6 +42,8 @@ export interface Presentation {
   description: string | null;
   status: PresentationStatus;
   round_number: number;
+  presentation_series_id?: string | null;
+  previous_presentation_id?: string | null;
   sent_at: string | null;
   created_by: string | null;
   created_at: string;
@@ -42,6 +52,19 @@ export interface Presentation {
   client?: PresentationClientRelation | null;
   items_count?: number;
   items?: PresentationItem[];
+  previous_presentation?: {
+    id: string;
+    title: string;
+    round_number: number;
+    status: PresentationStatus;
+  } | null;
+  next_presentation?: {
+    id: string;
+    title: string;
+    round_number: number;
+    status: PresentationStatus;
+  } | null;
+  series_rounds?: PresentationSeriesRound[];
 }
 
 export interface PresentationItem {
@@ -154,5 +177,21 @@ export interface PublicPresentationData extends Presentation {
     expires_at?: string | null;
     created_at?: string;
   };
+}
+
+export interface PublicDecisionSubmissionInput {
+  token: string;
+  itemId: string;
+  status: 'approved' | 'changes_requested' | 'rejected';
+  feedback?: string | null;
+}
+
+export interface PublicDecisionResponse {
+  item_id: string;
+  client_approval_status: PresentationItemApprovalStatus;
+  client_feedback: string | null;
+  reviewed_at: string;
+  presentation_id: string;
+  presentation_status: PresentationStatus;
 }
 

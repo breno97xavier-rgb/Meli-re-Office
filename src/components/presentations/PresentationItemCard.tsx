@@ -111,6 +111,15 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  const handleStatusSelectChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newStatus = e.target.value;
+    try {
+      await onUpdateStatus(item.id, newStatus);
+    } catch {
+      // Error handled by parent hook
+    }
+  };
+
   if (!content) {
     return (
       <div className="bg-white border border-red-200 rounded-2xl p-4 flex items-center justify-between text-xs text-red-700">
@@ -464,7 +473,7 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
                 {/* Admin Status Quick Select */}
                 <select
                   value={item.client_approval_status || 'pending'}
-                  onChange={(e) => onUpdateStatus(item.id, e.target.value)}
+                  onChange={handleStatusSelectChange}
                   className="text-[11px] px-2 py-1 bg-[#FAFAFA] border border-[#E8E9EA] rounded-lg text-[#1D1D1D] cursor-pointer"
                 >
                   {Object.entries(ITEM_APPROVAL_STATUS_LABELS).map(([k, label]) => (

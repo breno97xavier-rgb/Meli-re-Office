@@ -35,6 +35,24 @@ export function formatContentError(error: unknown): string {
     hint: errObj.hint,
   });
 
+  if (lowerMsg.includes('editorial_plan_client_mismatch')) {
+    return 'O ciclo de planejamento selecionado não pertence ao cliente informado.';
+  }
+  if (lowerMsg.includes('pillar_client_mismatch')) {
+    return 'O pilar selecionado não pertence ao cliente informado.';
+  }
+  if (lowerMsg.includes('campaign_client_mismatch')) {
+    return 'A campanha selecionada não pertence ao cliente informado.';
+  }
+  if (lowerMsg.includes('contents_editorial_plan_id_fkey') || (lowerMsg.includes('editorial_plan') && lowerMsg.includes('foreign key'))) {
+    return 'Plano editorial inválido ou inexistente.';
+  }
+  if (lowerMsg.includes('contents_pillar_id_fkey') || (lowerMsg.includes('pillar_id') && lowerMsg.includes('foreign key'))) {
+    return 'Pilar editorial inválido ou inexistente.';
+  }
+  if (lowerMsg.includes('contents_campaign_id_fkey') || (lowerMsg.includes('campaign_id') && lowerMsg.includes('foreign key'))) {
+    return 'Campanha inválida ou inexistente.';
+  }
   if (lowerMsg.includes('violates foreign key constraint') || lowerMsg.includes('client_id')) {
     return 'Cliente inválido ou não encontrado.';
   }
@@ -68,11 +86,23 @@ function normalizeContent(item: unknown): Content {
   const assigned_profile = Array.isArray(row.assigned_profile)
     ? row.assigned_profile[0] || null
     : row.assigned_profile || null;
+  const editorial_plan = Array.isArray(row.editorial_plan)
+    ? row.editorial_plan[0] || null
+    : row.editorial_plan || null;
+  const client_pillar = Array.isArray(row.client_pillar)
+    ? row.client_pillar[0] || null
+    : row.client_pillar || null;
+  const campaign = Array.isArray(row.campaign)
+    ? row.campaign[0] || null
+    : row.campaign || null;
 
   return {
     ...row,
     client,
     assigned_profile,
+    editorial_plan,
+    client_pillar,
+    campaign,
   } as unknown as Content;
 }
 
@@ -103,6 +133,9 @@ export async function fetchContents(clientId?: string): Promise<Content[]> {
         visual_copy,
         scheduled_date,
         published_at,
+        editorial_plan_id,
+        pillar_id,
+        campaign_id,
         client:clients(
           id,
           name,
@@ -116,6 +149,25 @@ export async function fetchContents(clientId?: string): Promise<Content[]> {
           display_name,
           avatar_url,
           role
+        ),
+        editorial_plan:editorial_plans(
+          id,
+          title,
+          status,
+          start_date,
+          end_date
+        ),
+        client_pillar:client_pillars(
+          id,
+          name,
+          is_active
+        ),
+        campaign:campaigns(
+          id,
+          name,
+          status,
+          start_date,
+          end_date
         )
       `)
       .order('planned_date', { ascending: true, nullsFirst: false })
@@ -207,6 +259,9 @@ export async function fetchContentById(contentId: string): Promise<Content> {
       visual_copy,
       scheduled_date,
       published_at,
+      editorial_plan_id,
+      pillar_id,
+      campaign_id,
       client:clients(
         id,
         name,
@@ -220,6 +275,25 @@ export async function fetchContentById(contentId: string): Promise<Content> {
         display_name,
         avatar_url,
         role
+      ),
+      editorial_plan:editorial_plans(
+        id,
+        title,
+        status,
+        start_date,
+        end_date
+      ),
+      client_pillar:client_pillars(
+        id,
+        name,
+        is_active
+      ),
+      campaign:campaigns(
+        id,
+        name,
+        status,
+        start_date,
+        end_date
       )
     `)
     .eq('id', contentId)
@@ -271,6 +345,9 @@ export async function createContent(input: CreateContentInput): Promise<Content>
     notes: input.notes?.trim() || null,
     assigned_to: input.assigned_to || null,
     editorial_status,
+    editorial_plan_id: input.editorial_plan_id ? input.editorial_plan_id.trim() : null,
+    pillar_id: input.pillar_id ? input.pillar_id.trim() : null,
+    campaign_id: input.campaign_id ? input.campaign_id.trim() : null,
   };
 
   if (input.visual_copy !== undefined && input.visual_copy !== null) {
@@ -295,6 +372,25 @@ export async function createContent(input: CreateContentInput): Promise<Content>
         display_name,
         avatar_url,
         role
+      ),
+      editorial_plan:editorial_plans(
+        id,
+        title,
+        status,
+        start_date,
+        end_date
+      ),
+      client_pillar:client_pillars(
+        id,
+        name,
+        is_active
+      ),
+      campaign:campaigns(
+        id,
+        name,
+        status,
+        start_date,
+        end_date
       )
     `)
     .single();
@@ -348,6 +444,15 @@ export async function updateContent(
   if (input.notes !== undefined) payload.notes = input.notes?.trim() || null;
   if (input.assigned_to !== undefined) payload.assigned_to = input.assigned_to || null;
   if (input.client_id !== undefined) payload.client_id = input.client_id;
+  if (input.editorial_plan_id !== undefined) {
+    payload.editorial_plan_id = input.editorial_plan_id ? input.editorial_plan_id.trim() : null;
+  }
+  if (input.pillar_id !== undefined) {
+    payload.pillar_id = input.pillar_id ? input.pillar_id.trim() : null;
+  }
+  if (input.campaign_id !== undefined) {
+    payload.campaign_id = input.campaign_id ? input.campaign_id.trim() : null;
+  }
 
   const { data, error } = await supabase
     .from('contents')
@@ -368,6 +473,25 @@ export async function updateContent(
         display_name,
         avatar_url,
         role
+      ),
+      editorial_plan:editorial_plans(
+        id,
+        title,
+        status,
+        start_date,
+        end_date
+      ),
+      client_pillar:client_pillars(
+        id,
+        name,
+        is_active
+      ),
+      campaign:campaigns(
+        id,
+        name,
+        status,
+        start_date,
+        end_date
       )
     `)
     .single();

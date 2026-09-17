@@ -130,15 +130,21 @@ export function useContents(options?: UseContentsOptions) {
         const clientNameMatch =
           content.client?.commercial_name?.toLowerCase().includes(query) ||
           content.client?.name?.toLowerCase().includes(query);
+        const planMatch = content.editorial_plan?.title?.toLowerCase().includes(query);
+        const campaignMatch = content.campaign?.name?.toLowerCase().includes(query);
+        const structuredPillarMatch = content.client_pillar?.name?.toLowerCase().includes(query);
 
         if (
           !titleMatch &&
           !goalMatch &&
           !pillarMatch &&
+          !structuredPillarMatch &&
           !copyMatch &&
           !captionMatch &&
           !notesMatch &&
-          !clientNameMatch
+          !clientNameMatch &&
+          !planMatch &&
+          !campaignMatch
         ) {
           return false;
         }

@@ -114,6 +114,28 @@ export interface ContentProfileRelation {
   role?: string;
 }
 
+export interface ContentEditorialPlanRelation {
+  id: string;
+  title: string;
+  status: string;
+  start_date?: string | null;
+  end_date?: string | null;
+}
+
+export interface ContentPillarRelation {
+  id: string;
+  name: string;
+  is_active?: boolean;
+}
+
+export interface ContentCampaignRelation {
+  id: string;
+  name: string;
+  status: string;
+  start_date?: string | null;
+  end_date?: string | null;
+}
+
 export interface Content {
   id: string;
   client_id: string;
@@ -137,9 +159,15 @@ export interface Content {
   visual_copy?: string | null;
   scheduled_date?: string | null;
   published_at?: string | null;
+  editorial_plan_id?: string | null;
+  pillar_id?: string | null;
+  campaign_id?: string | null;
   // Joined relations
   client?: ContentClientRelation | null;
   assigned_profile?: ContentProfileRelation | null;
+  editorial_plan?: ContentEditorialPlanRelation | null;
+  client_pillar?: ContentPillarRelation | null;
+  campaign?: ContentCampaignRelation | null;
 }
 
 export interface CreateContentInput {
@@ -158,6 +186,9 @@ export interface CreateContentInput {
   notes?: string | null;
   assigned_to?: string | null;
   editorial_status?: EditorialStatus;
+  editorial_plan_id?: string | null;
+  pillar_id?: string | null;
+  campaign_id?: string | null;
 }
 
 export interface UpdateContentInput {
@@ -176,6 +207,9 @@ export interface UpdateContentInput {
   assigned_to?: string | null;
   editorial_status?: EditorialStatus;
   client_id?: string;
+  editorial_plan_id?: string | null;
+  pillar_id?: string | null;
+  campaign_id?: string | null;
 }
 
 export interface ContentFilters {

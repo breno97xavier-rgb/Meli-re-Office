@@ -11,6 +11,7 @@ import { ContractsPage } from '@/src/pages/ContractsPage';
 import { ClientsPage } from '@/src/pages/ClientsPage';
 import { ClientProfilePage } from '@/src/pages/ClientProfilePage';
 import { ContentsPage } from '@/src/pages/ContentsPage';
+import { PlanningPage } from '@/src/pages/PlanningPage';
 import { PresentationsPage } from '@/src/pages/PresentationsPage';
 import { PresentationEditorPage } from '@/src/pages/PresentationEditorPage';
 import { PresentationViewerPage } from '@/src/pages/PresentationViewerPage';
@@ -80,6 +81,8 @@ function AppContent() {
         return <ContractsPage />;
       case '/clientes':
         return <ClientsPage onNavigate={navigate} />;
+      case '/planejamento':
+        return <PlanningPage />;
       case '/conteudos':
         return <ContentsPage />;
       case '/apresentacoes':
