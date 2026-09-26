@@ -50,11 +50,18 @@ DECLARE
   v_workspace_count integer;
   v_null_count bigint;
 BEGIN
-  SELECT count(*), min(id)
-    INTO v_workspace_count, v_workspace_id
+  SELECT count(*)
+    INTO v_workspace_count
   FROM public.workspaces
   WHERE slug = 'meliere'
     AND status = 'active';
+
+  SELECT id
+    INTO v_workspace_id
+  FROM public.workspaces
+  WHERE slug = 'meliere'
+    AND status = 'active'
+  LIMIT 1;
 
   IF v_workspace_count <> 1 OR v_workspace_id IS NULL THEN
     RAISE EXCEPTION
@@ -173,10 +180,16 @@ DECLARE
   v_workspace_id uuid;
   v_count integer;
 BEGIN
-  SELECT count(*), min(id)
-    INTO v_count, v_workspace_id
+  SELECT count(*)
+    INTO v_count
   FROM public.workspaces
   WHERE status = 'active';
+
+  SELECT id
+    INTO v_workspace_id
+  FROM public.workspaces
+  WHERE status = 'active'
+  LIMIT 1;
 
   IF v_count <> 1 OR v_workspace_id IS NULL THEN
     RAISE EXCEPTION
