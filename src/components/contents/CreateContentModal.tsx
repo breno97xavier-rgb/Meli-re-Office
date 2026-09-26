@@ -33,6 +33,7 @@ interface CreateContentModalProps {
   clients: Client[];
   teamProfiles: ContentProfileRelation[];
   initialClientId?: string;
+  initialPlannedDate?: string;
   isSaving: boolean;
   error?: string | null;
 }
@@ -44,6 +45,7 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
   clients,
   teamProfiles,
   initialClientId,
+  initialPlannedDate,
   isSaving,
   error,
 }) => {
@@ -56,7 +58,7 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
   const [funnelStage, setFunnelStage] = useState('');
   const [copy, setCopy] = useState('');
   const [caption, setCaption] = useState('');
-  const [plannedDate, setPlannedDate] = useState('');
+  const [plannedDate, setPlannedDate] = useState(initialPlannedDate || '');
   const [assignedTo, setAssignedTo] = useState('');
   const [notes, setNotes] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -90,7 +92,7 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
       setFunnelStage('');
       setCopy('');
       setCaption('');
-      setPlannedDate('');
+      setPlannedDate(initialPlannedDate || '');
       setAssignedTo('');
       setNotes('');
       setEditorialPlanId('');
@@ -98,7 +100,7 @@ export const CreateContentModal: React.FC<CreateContentModalProps> = ({
       setCampaignId('');
       setValidationError(null);
     }
-  }, [isOpen, initialClientId, clients]);
+  }, [isOpen, initialClientId, initialPlannedDate, clients]);
 
   // Handle client change: clear planning selections to prevent cross-tenant assignment
   const handleClientChange = (newClientId: string) => {

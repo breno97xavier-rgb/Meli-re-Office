@@ -60,6 +60,7 @@ export type BusinessStage =
 
 export interface Lead {
   id: string;
+  workspace_id?: string;
   created_at: string;
   updated_at?: string | null;
   name: string;

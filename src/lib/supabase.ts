@@ -1,7 +1,27 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ycagvwsvccgdjzpbhrfi.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const getEnv = (key: string): string | undefined => {
+  try {
+    // Vite / Browser environment
+    if (typeof import.meta !== 'undefined' && import.meta.env && key in import.meta.env) {
+      return (import.meta.env as Record<string, string | undefined>)[key];
+    }
+  } catch {
+    // Ignore error in environments without import.meta.env
+  }
+  try {
+    // Node.js / SSR / Test environment
+    if (typeof process !== 'undefined' && process.env && key in process.env) {
+      return process.env[key];
+    }
+  } catch {
+    // Ignore error in environments without process.env
+  }
+  return undefined;
+};
+
+const supabaseUrl = getEnv('VITE_SUPABASE_URL') || 'https://ycagvwsvccgdjzpbhrfi.supabase.co';
+const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY') || '';
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
@@ -9,12 +29,6 @@ let supabaseInstance: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient {
   if (!supabaseInstance) {
-    if (!isSupabaseConfigured && process.env.NODE_ENV !== 'production') {
-      console.warn(
-        '[Melière Office] Variáveis de ambiente Supabase (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY) não estão configuradas. O cliente funcionará em modo restrito.'
-      );
-    }
-    
     supabaseInstance = createClient(supabaseUrl, supabaseAnonKey || 'dummy-anon-key-placeholder', {
       auth: {
         autoRefreshToken: true,

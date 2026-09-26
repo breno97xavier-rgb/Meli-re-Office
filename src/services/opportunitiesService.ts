@@ -55,9 +55,64 @@ export async function createOpportunity(
     ownerId = user?.id || null;
   }
 
+  let resolvedWorkspaceId: string | null = null;
+
+  // A. Se a oportunidade está vinculada a um Lead, herda o workspace do Lead
+  if (input.lead_id) {
+    const { data: leadData, error: leadErr } = await supabase
+      .from('leads')
+      .select('id, workspace_id')
+      .eq('id', input.lead_id)
+      .maybeSingle();
+
+    if (leadErr || !leadData) {
+      throw new Error('LEAD_NOT_FOUND: Lead de origem não encontrado.');
+    }
+    if (!leadData.workspace_id) {
+      throw new Error('LEAD_HAS_NO_WORKSPACE: O lead especificado não possui workspace associado.');
+    }
+    resolvedWorkspaceId = leadData.workspace_id;
+  }
+
+  // B. Se a oportunidade está vinculada a um Client, herda o workspace do Client
+  if (input.client_id) {
+    const { data: clientData, error: clientErr } = await supabase
+      .from('clients')
+      .select('id, workspace_id')
+      .eq('id', input.client_id)
+      .maybeSingle();
+
+    if (clientErr || !clientData) {
+      throw new Error('CLIENT_NOT_FOUND: Cliente de origem não encontrado.');
+    }
+    if (!clientData.workspace_id) {
+      throw new Error('CLIENT_HAS_NO_WORKSPACE: O cliente especificado não possui workspace associado.');
+    }
+    if (resolvedWorkspaceId && resolvedWorkspaceId !== clientData.workspace_id) {
+      throw new Error('CROSS_WORKSPACE_MISMATCH: O lead e o cliente pertencem a workspaces diferentes.');
+    }
+    resolvedWorkspaceId = clientData.workspace_id;
+  }
+
+  // C. Se o caller passou workspace_id explicitamente, valida compatibilidade
+  if (input.workspace_id) {
+    if (resolvedWorkspaceId && resolvedWorkspaceId !== input.workspace_id) {
+      throw new Error('CROSS_WORKSPACE_MISMATCH: O workspace_id informado diverge do workspace da entidade de origem.');
+    }
+    resolvedWorkspaceId = input.workspace_id;
+  }
+
+  // D. Criação totalmente avulsa (sem Lead, Client ou Workspace explícito)
+  if (!resolvedWorkspaceId) {
+    throw new Error('WORKSPACE_REQUIRED: É obrigatório informar o Workspace para criar uma oportunidade avulsa.');
+  }
+
   const payload = {
+    workspace_id: resolvedWorkspaceId,
     title: input.title.trim(),
     lead_id: input.lead_id || null,
+    client_id: input.client_id || null,
+    contact_id: input.contact_id || null,
     stage: input.stage || 'discovery',
     estimated_value:
       typeof input.estimated_value === 'number' && !isNaN(input.estimated_value)

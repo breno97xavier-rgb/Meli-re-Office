@@ -11,6 +11,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { Content, getFunnelStageLabel } from '../../types/contents';
+import { formatCivilDateBR } from '../../utils/civilDate';
 import { ContentStatusBadge } from './ContentStatusBadge';
 import { ContentFormatBadge } from './ContentFormatBadge';
 
@@ -25,20 +26,7 @@ interface ContentsTableProps {
 }
 
 function formatDate(dateStr?: string | null): string {
-  if (!dateStr) return '—';
-  try {
-    const [year, month, day] = dateStr.split('T')[0].split('-');
-    if (year && month && day) {
-      return `${day}/${month}/${year}`;
-    }
-    const d = new Date(dateStr);
-    if (!isNaN(d.getTime())) {
-      return d.toLocaleDateString('pt-BR');
-    }
-    return dateStr;
-  } catch {
-    return dateStr || '—';
-  }
+  return formatCivilDateBR(dateStr, '—');
 }
 
 function formatRelativeTime(dateStr: string): string {

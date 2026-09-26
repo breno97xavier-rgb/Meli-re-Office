@@ -91,9 +91,34 @@ export async function uploadProposalDocument(
     throw new Error('O arquivo excede o limite máximo permitido de 20 MB.');
   }
 
-  // Generate unique file path in bucket: proposals/<proposal_id>/<uuid>.pdf
+  // 0. Resolve workspace_id from proposal -> opportunity relation
+  const { data: proposalData, error: proposalErr } = await supabase
+    .from('proposals')
+    .select('opportunity_id')
+    .eq('id', proposalId)
+    .single();
+
+  if (proposalErr || !proposalData?.opportunity_id) {
+    console.error('Error resolving proposal for document upload:', proposalErr);
+    throw new Error('Proposta não encontrada para armazenamento do documento.');
+  }
+
+  const { data: oppData, error: oppErr } = await supabase
+    .from('opportunities')
+    .select('workspace_id')
+    .eq('id', proposalData.opportunity_id)
+    .single();
+
+  if (oppErr || !oppData?.workspace_id) {
+    console.error('Error resolving workspace for proposal opportunity:', oppErr);
+    throw new Error('Oportunidade vinculada não encontrada ou workspace inválido para armazenamento.');
+  }
+
+  const workspaceId = oppData.workspace_id;
+
+  // Generate canonical storage path in bucket: workspace/<workspace_id>/proposals/<proposal_id>/<uuid>.pdf
   const fileUuid = crypto.randomUUID();
-  const storagePath = `proposals/${proposalId}/${fileUuid}.pdf`;
+  const storagePath = `workspace/${workspaceId}/proposals/${proposalId}/${fileUuid}.pdf`;
 
   // 1. Upload to Supabase Storage
   const { error: uploadError } = await supabase.storage
@@ -178,9 +203,34 @@ export async function uploadContractDocument(
     throw new Error('O arquivo excede o limite máximo permitido de 20 MB.');
   }
 
-  // Generate unique file path in bucket: contracts/<contract_id>/<uuid>.pdf
+  // 0. Resolve workspace_id from contract -> opportunity relation
+  const { data: contractData, error: contractErr } = await supabase
+    .from('contracts')
+    .select('opportunity_id')
+    .eq('id', contractId)
+    .single();
+
+  if (contractErr || !contractData?.opportunity_id) {
+    console.error('Error resolving contract for document upload:', contractErr);
+    throw new Error('Contrato não encontrado para armazenamento do documento.');
+  }
+
+  const { data: oppData, error: oppErr } = await supabase
+    .from('opportunities')
+    .select('workspace_id')
+    .eq('id', contractData.opportunity_id)
+    .single();
+
+  if (oppErr || !oppData?.workspace_id) {
+    console.error('Error resolving workspace for contract opportunity:', oppErr);
+    throw new Error('Oportunidade vinculada não encontrada ou workspace inválido para armazenamento.');
+  }
+
+  const workspaceId = oppData.workspace_id;
+
+  // Generate canonical storage path in bucket: workspace/<workspace_id>/contracts/<contract_id>/<uuid>.pdf
   const fileUuid = crypto.randomUUID();
-  const storagePath = `contracts/${contractId}/${fileUuid}.pdf`;
+  const storagePath = `workspace/${workspaceId}/contracts/${contractId}/${fileUuid}.pdf`;
 
   // 1. Upload to Supabase Storage
   const { error: uploadError } = await supabase.storage

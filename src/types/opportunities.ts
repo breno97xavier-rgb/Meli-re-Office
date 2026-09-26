@@ -16,6 +16,7 @@ export interface OpportunityLeadInfo {
 
 export interface Opportunity {
   id: string;
+  workspace_id?: string;
   title: string;
   lead_id?: string | null;
   client_id?: string | null;
@@ -36,8 +37,11 @@ export interface Opportunity {
 }
 
 export interface CreateOpportunityInput {
+  workspace_id?: string;
   title: string;
   lead_id?: string | null;
+  client_id?: string | null;
+  contact_id?: string | null;
   stage?: OpportunityStage;
   estimated_value?: number | null;
   services_of_interest?: string[];

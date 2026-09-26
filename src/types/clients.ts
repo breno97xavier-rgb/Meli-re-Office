@@ -31,6 +31,7 @@ export interface ClientOriginOpportunity {
 
 export interface Client {
   id: string;
+  workspace_id?: string;
   name: string;
   commercial_name?: string | null;
   slug?: string | null;

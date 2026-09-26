@@ -11,6 +11,7 @@ import { ContractsPage } from '@/src/pages/ContractsPage';
 import { ClientsPage } from '@/src/pages/ClientsPage';
 import { ClientProfilePage } from '@/src/pages/ClientProfilePage';
 import { ContentsPage } from '@/src/pages/ContentsPage';
+import { CalendarPage } from '@/src/pages/CalendarPage';
 import { PlanningPage } from '@/src/pages/PlanningPage';
 import { PresentationsPage } from '@/src/pages/PresentationsPage';
 import { PresentationEditorPage } from '@/src/pages/PresentationEditorPage';
@@ -85,6 +86,8 @@ function AppContent() {
         return <PlanningPage />;
       case '/conteudos':
         return <ContentsPage />;
+      case '/calendario':
+        return <CalendarPage />;
       case '/apresentacoes':
         return <PresentationsPage />;
       default:

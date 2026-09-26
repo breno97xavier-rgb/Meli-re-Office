@@ -132,10 +132,24 @@ export async function uploadContentAsset(
 
   validateAssetFile(file, assetType);
 
-  // Generate clean storage path: <client_id>/<content_id>/<uuid>.<ext>
+  // 0. Resolve workspace_id from client relation
+  const { data: clientData, error: clientErr } = await supabase
+    .from('clients')
+    .select('workspace_id')
+    .eq('id', clientId)
+    .single();
+
+  if (clientErr || !clientData?.workspace_id) {
+    console.error('Error resolving workspace for client:', clientErr);
+    throw new Error('Cliente não encontrado ou workspace inválido para armazenamento.');
+  }
+
+  const workspaceId = clientData.workspace_id;
+
+  // Generate canonical storage path: workspace/<workspace_id>/clients/<client_id>/contents/<content_id>/<uuid>.<ext>
   const fileUuid = crypto.randomUUID();
   const ext = getFileExtension(file);
-  const storagePath = `${clientId}/${contentId}/${fileUuid}.${ext}`;
+  const storagePath = `workspace/${workspaceId}/clients/${clientId}/contents/${contentId}/${fileUuid}.${ext}`;
 
   // 1. Upload to Supabase Storage
   const { error: uploadError } = await supabase.storage
@@ -246,10 +260,24 @@ export async function replaceContentAsset(
   const assetType = targetAsset.asset_type as ContentAssetType;
   validateAssetFile(file, assetType);
 
-  // Generate clean storage path
+  // 0. Resolve workspace_id from client relation
+  const { data: clientData, error: clientErr } = await supabase
+    .from('clients')
+    .select('workspace_id')
+    .eq('id', clientId)
+    .single();
+
+  if (clientErr || !clientData?.workspace_id) {
+    console.error('Error resolving workspace for client:', clientErr);
+    throw new Error('Cliente não encontrado ou workspace inválido para armazenamento.');
+  }
+
+  const workspaceId = clientData.workspace_id;
+
+  // Generate canonical storage path: workspace/<workspace_id>/clients/<client_id>/contents/<content_id>/<uuid>.<ext>
   const fileUuid = crypto.randomUUID();
   const ext = getFileExtension(file);
-  const storagePath = `${clientId}/${contentId}/${fileUuid}.${ext}`;
+  const storagePath = `workspace/${workspaceId}/clients/${clientId}/contents/${contentId}/${fileUuid}.${ext}`;
 
   // 1. Upload to Supabase Storage
   const { error: uploadError } = await supabase.storage

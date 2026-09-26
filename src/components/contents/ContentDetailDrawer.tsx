@@ -38,6 +38,7 @@ import {
 import { ContentFormatBadge } from './ContentFormatBadge';
 import { ContentAssetsSection } from './assets/ContentAssetsSection';
 import { useContentPlanningOptions } from '../../hooks/useContentPlanningOptions';
+import { parseCivilDate, formatCivilDateObject } from '../../utils/civilDate';
 
 interface ContentDetailDrawerProps {
   content: Content | null;
@@ -71,8 +72,8 @@ function formatDateTime(dateStr?: string | null): string {
 }
 
 function formatDate(dateStr?: string | null): string {
-  if (!dateStr) return '';
-  return dateStr.split('T')[0];
+  const parsed = parseCivilDate(dateStr);
+  return parsed ? formatCivilDateObject(parsed) : '';
 }
 
 export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({

@@ -7,6 +7,7 @@ import {
   UpdateContentInput,
   ContentProfileRelation,
 } from '../types/contents';
+import { parseCivilDate, formatCivilDateObject } from '../utils/civilDate';
 
 const VALID_FORMATS: ContentFormat[] = ['feed_single', 'carousel', 'reels', 'story'];
 const VALID_STATUSES: EditorialStatus[] = [
@@ -522,3 +523,82 @@ export async function fetchTeamProfiles(): Promise<ContentProfileRelation[]> {
     return [];
   }
 }
+
+/**
+ * Operação cirúrgica para alteração exclusiva de planned_date de um conteúdo.
+ * Utilizada para reposicionamento temporal via Calendário / Backlog.
+ * Não altera nenhum outro campo operacional do registro.
+ */
+export async function updateContentPlannedDate(
+  contentId: string,
+  plannedDate: string | null
+): Promise<Content> {
+  if (!contentId || typeof contentId !== 'string' || !contentId.trim()) {
+    throw new Error('ID do conteúdo inválido ou não fornecido.');
+  }
+
+  let sanitizedDate: string | null = null;
+  if (plannedDate !== null && plannedDate !== undefined && plannedDate.trim() !== '') {
+    const parsed = parseCivilDate(plannedDate);
+    if (!parsed) {
+      throw new Error(
+        'Data planejada inválida. Utilize uma data civil válida no formato YYYY-MM-DD.'
+      );
+    }
+    sanitizedDate = formatCivilDateObject(parsed);
+  }
+
+  const payload = {
+    planned_date: sanitizedDate,
+  };
+
+  const { data, error } = await supabase
+    .from('contents')
+    .update(payload)
+    .eq('id', contentId.trim())
+    .select(`
+      *,
+      client:clients(
+        id,
+        name,
+        commercial_name,
+        status,
+        logo_url
+      ),
+      assigned_profile:profiles!contents_assigned_to_fkey(
+        id,
+        full_name,
+        display_name,
+        avatar_url,
+        role
+      ),
+      editorial_plan:editorial_plans(
+        id,
+        title,
+        status,
+        start_date,
+        end_date
+      ),
+      client_pillar:client_pillars(
+        id,
+        name,
+        is_active
+      ),
+      campaign:campaigns(
+        id,
+        name,
+        status,
+        start_date,
+        end_date
+      )
+    `)
+    .single();
+
+  if (error) {
+    console.error('Error updating content planned date:', error);
+    throw new Error(formatContentError(error));
+  }
+
+  return normalizeContent(data);
+}
+

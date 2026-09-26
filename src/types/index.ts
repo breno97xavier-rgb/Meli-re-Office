@@ -75,3 +75,4 @@ export * from './contents';
 export * from './contentAssets';
 export * from './presentations';
 export * from './planning';
+export * from './workspaces';
