@@ -1,4 +1,4 @@
-param([int]$Port = 55439)
+param([int]$Port = 55439, [switch]$IncludeWorkspaceScope)
 $ErrorActionPreference = 'Stop'
 $labRoot = Join-Path $env:TEMP 'office-helper-lab-20261009'
 $bin = Join-Path $labRoot 'pgsql/bin'
@@ -74,6 +74,12 @@ try {
   $rolesOwned = $true
   & $psql -X --dbname=$connection -v ON_ERROR_STOP=1 -f (Join-Path $PSScriptRoot 'presentation-decisions.sql')
   if ($LASTEXITCODE -ne 0) { throw 'Falha na suíte SQL.' }
+  if ($IncludeWorkspaceScope) {
+    & $psql -X --dbname=$connection -v ON_ERROR_STOP=1 -f (Join-Path $PSScriptRoot 'presentation-workspace-fixture.sql')
+    if ($LASTEXITCODE -ne 0) { throw 'Falha no fixture de workspace.' }
+    & $psql -X --dbname=$connection -v ON_ERROR_STOP=1 -f (Join-Path $PSScriptRoot 'presentation-workspace.sql')
+    if ($LASTEXITCODE -ne 0) { throw 'Falha nos testes de workspace.' }
+  }
 
   $anon = "SET ROLE anon; SET request.jwt.claim.role='anon'; SET request.jwt.claim.sub='';"
   # Same item: first decision commits, second observes the final state and is rejected.
@@ -114,6 +120,18 @@ try {
   if (-not $b.WaitForExit(15000)) { throw 'Timeout de expiração.' }; $b.Refresh()
   if ($b.ExitCode -eq 0 -or -not ([IO.File]::ReadAllText((Join-Path $work 'office_expire_second.err')).Contains('ACCESS_TOKEN_EXPIRED'))) { throw 'FAIL: expiração durante espera ignorada.' }
   Assert-Lab 'expiry during lock wait prevents write' "SELECT client_approval_status='pending' FROM presentation_items WHERE id=lab_uuid(75);"
+  if ($IncludeWorkspaceScope) {
+    $operator = "SET ROLE authenticated; SET request.jwt.claim.role='authenticated'; SET request.jwt.claim.sub='00000000-0000-0000-0000-000000000203';"
+    $a = Start-LabSession 'office_round_first' "BEGIN; $operator SELECT create_next_presentation_round(lab_uuid(53),ARRAY[lab_uuid(39)]); SELECT pg_sleep(1.5); COMMIT;"
+    Wait-LabSleep 'office_round_first'
+    $b = Start-LabSession 'office_round_second' "$operator SELECT create_next_presentation_round(lab_uuid(53),ARRAY[lab_uuid(39)]);"
+    Wait-LabLock 'office_round_second'
+    Wait-LabSuccess $a 'office_round_first'
+    if (-not $b.WaitForExit(15000)) { throw 'Timeout da rodada concorrente.' }; $b.Refresh()
+    if ($b.ExitCode -eq 0 -or -not ([IO.File]::ReadAllText((Join-Path $work 'office_round_second.err')).Contains('ALREADY_HAS_NEXT_ROUND'))) { throw 'FAIL: duas rodadas diretas criadas concorrencialmente.' }
+    Assert-Lab 'concurrent round creates one successor' "SELECT count(*)=1 FROM presentations WHERE previous_presentation_id=lab_uuid(53);"
+    Assert-Lab 'source round remains in history' "SELECT round_number=1 AND previous_presentation_id IS NULL FROM presentations WHERE id=lab_uuid(53);"
+  }
   Assert-Lab 'no deadlocks in isolated database' "SELECT deadlocks=0 FROM pg_stat_database WHERE datname=current_database();"
 } finally {
   # Processes belong exclusively to this run; allow pending transactions to finish before cleanup.

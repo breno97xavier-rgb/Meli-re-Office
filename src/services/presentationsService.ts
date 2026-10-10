@@ -361,15 +361,15 @@ export async function updatePresentation(
 export async function deletePresentation(id: string): Promise<void> {
   if (!id) throw new Error('ID da apresentação não informado.');
 
-  // 1. Delete items first
-  await supabase.from('presentation_items').delete().eq('presentation_id', id);
-
-  // 2. Delete presentation
-  const { error } = await supabase.from('presentations').delete().eq('id', id);
+  // The existing FK cascades items atomically; a failed parent deletion preserves them.
+  const { data, error } = await supabase.from('presentations').delete().eq('id', id).select('id');
 
   if (error) {
     console.error('Error deleting presentation:', error);
     throw new Error(formatPresentationError(error));
+  }
+  if (!data?.length) {
+    throw new Error('Apresentação não encontrada ou sem permissão para excluir.');
   }
 }
 
@@ -629,14 +629,18 @@ export async function addMultipleContentsToPresentation(
 export async function removeContentFromPresentation(itemId: string): Promise<void> {
   if (!itemId) throw new Error('ID do item não informado.');
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('presentation_items')
     .delete()
-    .eq('id', itemId);
+    .eq('id', itemId)
+    .select('id');
 
   if (error) {
     console.error('Error removing content from presentation:', error);
     throw new Error(formatPresentationError(error));
+  }
+  if (!data?.length) {
+    throw new Error('Item não encontrado ou sem permissão para excluir.');
   }
 }
 
