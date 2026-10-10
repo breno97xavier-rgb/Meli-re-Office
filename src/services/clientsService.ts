@@ -68,8 +68,8 @@ export async function fetchClients(): Promise<Client[]> {
         origin_opportunity_id,
         created_at,
         updated_at,
-        origin_contract:contracts!clients_origin_contract_id_fkey(id, contract_number, title, version),
-        origin_opportunity:opportunities!clients_origin_opportunity_id_fkey(id, title)
+        origin_contract:contracts!fk_clients_origin_contract_opportunity(id, contract_number, title, version),
+        origin_opportunity:opportunities!fk_clients_workspace_origin_opportunity(id, title)
       `)
       .order('created_at', { ascending: false });
 
@@ -167,8 +167,8 @@ export async function updateClient(
       origin_opportunity_id,
       created_at,
       updated_at,
-      origin_contract:contracts!clients_origin_contract_id_fkey(id, contract_number, title, version),
-      origin_opportunity:opportunities!clients_origin_opportunity_id_fkey(id, title)
+      origin_contract:contracts!fk_clients_origin_contract_opportunity(id, contract_number, title, version),
+      origin_opportunity:opportunities!fk_clients_workspace_origin_opportunity(id, title)
     `)
     .single();
 
@@ -229,7 +229,7 @@ export async function fetchClientById(clientId: string): Promise<Client | null> 
         origin_opportunity_id,
         created_at,
         updated_at,
-        origin_contract:contracts!clients_origin_contract_id_fkey(
+        origin_contract:contracts!fk_clients_origin_contract_opportunity(
           id,
           contract_number,
           title,
@@ -241,7 +241,7 @@ export async function fetchClientById(clientId: string): Promise<Client | null> 
           one_time_amount,
           signed_at
         ),
-        origin_opportunity:opportunities!clients_origin_opportunity_id_fkey(
+        origin_opportunity:opportunities!fk_clients_workspace_origin_opportunity(
           id,
           title,
           stage,
