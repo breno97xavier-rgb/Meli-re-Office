@@ -9,6 +9,7 @@ import {
 import { Content } from '../types/contents';
 import { ContentAsset } from '../types/contentAssets';
 import { fetchContentAssets } from './contentAssetsService';
+import { normalizeItemApprovalStatus, normalizePresentationStatus } from './presentationDecisionContracts';
 
 export function formatPresentationError(error: unknown): string {
   if (!error) return 'Ocorreu um erro desconhecido.';
@@ -60,6 +61,7 @@ function normalizePresentation(item: unknown): Presentation {
   return {
     ...row,
     client,
+    status: normalizePresentationStatus(row.status),
   } as unknown as Presentation;
 }
 
@@ -454,7 +456,7 @@ export async function fetchPresentationItems(presentationId: string): Promise<Pr
         content_id: row.content_id as string,
         display_order: typeof row.display_order === 'number' ? row.display_order : 0,
         presentation_notes: (row.presentation_notes as string) || null,
-        client_approval_status: (row.client_approval_status as string) || 'pending',
+        client_approval_status: normalizeItemApprovalStatus(row.client_approval_status),
         client_feedback: (row.client_feedback as string) || null,
         reviewed_at: (row.reviewed_at as string) || null,
         created_at: row.created_at as string,
@@ -587,7 +589,7 @@ export async function addContentToPresentation(
     content_id: data.content_id,
     display_order: data.display_order,
     presentation_notes: data.presentation_notes,
-    client_approval_status: data.client_approval_status,
+    client_approval_status: normalizeItemApprovalStatus(data.client_approval_status),
     client_feedback: data.client_feedback,
     reviewed_at: data.reviewed_at,
     created_at: data.created_at,
@@ -776,7 +778,7 @@ export async function updatePresentationItem(
     content_id: data.content_id,
     display_order: data.display_order,
     presentation_notes: data.presentation_notes,
-    client_approval_status: data.client_approval_status,
+    client_approval_status: normalizeItemApprovalStatus(data.client_approval_status),
     client_feedback: data.client_feedback,
     reviewed_at: data.reviewed_at,
     created_at: data.created_at,

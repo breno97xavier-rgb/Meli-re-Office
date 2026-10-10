@@ -1,0 +1,122 @@
+\set ON_ERROR_STOP on
+BEGIN;
+SELECT lab_assert('central RPC denied to anon', NOT has_function_privilege('anon','public.reconcile_presentation_item_decision(uuid,text,text,text,boolean)','EXECUTE'));
+SELECT lab_assert('central RPC denied to authenticated', NOT has_function_privilege('authenticated','public.reconcile_presentation_item_decision(uuid,text,text,text,boolean)','EXECUTE'));
+SELECT lab_assert('public RPC allowed to anon', has_function_privilege('anon','public.submit_public_presentation_decision(text,uuid,text,text)','EXECUTE'));
+SELECT lab_assert('admin RPC denied to anon', NOT has_function_privilege('anon','public.update_presentation_item_admin_decision(uuid,text,text,text,boolean)','EXECUTE'));
+SELECT lab_assert('RPCs use fixed search_path', (SELECT bool_and(proconfig=ARRAY['search_path=public, pg_temp']) FROM pg_proc WHERE proname IN ('reconcile_presentation_item_decision','submit_public_presentation_decision','update_presentation_item_admin_decision')));
+
+SET ROLE anon;
+SET request.jwt.claim.role='anon';
+SET request.jwt.claim.sub='';
+SELECT lab_assert('direct anonymous read blocked', (SELECT count(*)=0 FROM presentation_items));
+SELECT lab_expect_error('direct central call denied', $$SELECT reconcile_presentation_item_decision(lab_uuid(61),'approved')$$,'permission denied for function reconcile_presentation_item_decision');
+SELECT lab_expect_error('invalid token', $$SELECT submit_public_presentation_decision(repeat('z',64),lab_uuid(61),'approved')$$,'INVALID_ACCESS_TOKEN');
+SELECT lab_expect_error('short token', $$SELECT submit_public_presentation_decision('short',lab_uuid(61),'approved')$$,'INVALID_ACCESS_TOKEN');
+SELECT lab_expect_error('null token', $$SELECT submit_public_presentation_decision(NULL,lab_uuid(61),'approved')$$,'INVALID_ACCESS_TOKEN');
+SELECT lab_expect_error('expired token', $$SELECT submit_public_presentation_decision(repeat('b',64),lab_uuid(61),'approved')$$,'ACCESS_TOKEN_EXPIRED');
+SELECT lab_expect_error('revoked token', $$SELECT submit_public_presentation_decision(repeat('c',64),lab_uuid(61),'approved')$$,'ACCESS_TOKEN_REVOKED');
+SELECT lab_expect_error('item from another presentation', $$SELECT submit_public_presentation_decision(repeat('a',64),lab_uuid(63),'approved')$$,'INVALID_ITEM');
+SELECT lab_expect_error('missing item', $$SELECT submit_public_presentation_decision(repeat('a',64),lab_uuid(999),'approved')$$,'INVALID_ITEM');
+SELECT lab_expect_error('null item', $$SELECT submit_public_presentation_decision(repeat('a',64),NULL,'approved')$$,'INVALID_ITEM');
+SELECT lab_expect_error('public cannot reopen', $$SELECT submit_public_presentation_decision(repeat('a',64),lab_uuid(61),'pending')$$,'INVALID_DECISION_STATUS');
+SELECT lab_expect_error('invalid decision', $$SELECT submit_public_presentation_decision(repeat('a',64),lab_uuid(61),'invalid')$$,'INVALID_DECISION_STATUS');
+SELECT lab_expect_error('adjustments require feedback', $$SELECT submit_public_presentation_decision(repeat('a',64),lab_uuid(61),'changes_requested',' ')$$,'FEEDBACK_REQUIRED');
+SELECT lab_expect_error('rejection requires feedback', $$SELECT submit_public_presentation_decision(repeat('a',64),lab_uuid(61),'rejected')$$,'FEEDBACK_REQUIRED');
+SELECT lab_assert('first public approval succeeds',submit_public_presentation_decision(' '||repeat('a',64)||' ',lab_uuid(61),'approved')->>'client_approval_status'='approved');
+SELECT lab_expect_error('public decision immutable', $$SELECT submit_public_presentation_decision(repeat('a',64),lab_uuid(61),'rejected','another decision')$$,'ITEM_ALREADY_REVIEWED');
+SELECT lab_assert('adjustment response uses UI status',submit_public_presentation_decision(repeat('a',64),lab_uuid(62),'changes_requested','  revise caption  ')->>'client_approval_status'='changes_requested');
+RESET ROLE;
+SELECT lab_assert('approval syncs content', (SELECT editorial_status='approved' AND approved_at IS NOT NULL FROM contents WHERE id=lab_uuid(31)));
+SELECT lab_assert('real approval trigger sets transaction timestamp', (SELECT approved_at=transaction_timestamp() FROM contents WHERE id=lab_uuid(31)));
+SELECT lab_assert('real updated_at trigger runs on content', (SELECT updated_at=transaction_timestamp() FROM contents WHERE id=lab_uuid(31)));
+SELECT lab_assert('adjustment syncs content', (SELECT editorial_status='in_production' AND approved_at IS NULL FROM contents WHERE id=lab_uuid(32)));
+SELECT lab_assert('item DB status is compatible', (SELECT client_approval_status='adjustments_requested' AND client_feedback='revise caption' AND reviewed_at IS NOT NULL FROM presentation_items WHERE id=lab_uuid(62)));
+SELECT lab_assert('mixed terminal result respects DB constraint', (SELECT status='approved_with_adjustments' FROM presentations WHERE id=lab_uuid(41)));
+SELECT lab_assert('real updated_at trigger runs on presentation', (SELECT updated_at=transaction_timestamp() FROM presentations WHERE id=lab_uuid(41)));
+SELECT lab_assert('round lineage preserved', (SELECT round_number=2 AND previous_presentation_id=lab_uuid(41) AND presentation_series_id=lab_uuid(41) FROM presentations WHERE id=lab_uuid(44)));
+
+SET ROLE authenticated;
+SET request.jwt.claim.role='authenticated';
+SET request.jwt.claim.sub='00000000-0000-0000-0000-000000000204';
+SELECT lab_expect_error('suspended membership rejected', $$SELECT update_presentation_item_admin_decision(lab_uuid(61),'pending')$$,'UNAUTHORIZED');
+SET request.jwt.claim.sub='00000000-0000-0000-0000-000000000205';
+SELECT lab_expect_error('other workspace owner rejected', $$SELECT update_presentation_item_admin_decision(lab_uuid(61),'pending')$$,'UNAUTHORIZED');
+SET request.jwt.claim.sub='00000000-0000-0000-0000-000000000206';
+SELECT lab_expect_error('member without module permission rejected', $$SELECT update_presentation_item_admin_decision(lab_uuid(61),'pending')$$,'UNAUTHORIZED');
+SET request.jwt.claim.sub='00000000-0000-0000-0000-000000000207';
+SELECT lab_expect_error('view-only member rejected', $$SELECT update_presentation_item_admin_decision(lab_uuid(61),'pending')$$,'UNAUTHORIZED');
+SET request.jwt.claim.sub='00000000-0000-0000-0000-000000000203';
+SELECT lab_expect_error('unassigned local client rejected', $$SELECT update_presentation_item_admin_decision(lab_uuid(64),'approved')$$,'UNAUTHORIZED');
+SELECT lab_assert('assigned operation member can reopen',update_presentation_item_admin_decision(lab_uuid(61),'pending',NULL,'internal note',true)->>'client_approval_status'='pending');
+RESET ROLE;
+SELECT lab_assert('reopening clears reviewed_at and updates notes', (SELECT reviewed_at IS NULL AND presentation_notes='internal note' FROM presentation_items WHERE id=lab_uuid(61)));
+SELECT lab_assert('reopening clears unshared approval', (SELECT editorial_status='in_production' AND approved_at IS NULL FROM contents WHERE id=lab_uuid(31)));
+SELECT lab_assert('reopening returns presentation to review', (SELECT status='under_review' FROM presentations WHERE id=lab_uuid(41)));
+
+SET ROLE authenticated;
+SET request.jwt.claim.role='authenticated';
+SET request.jwt.claim.sub='';
+SELECT lab_expect_error('user identity required', $$SELECT update_presentation_item_admin_decision(lab_uuid(61),'approved')$$,'UNAUTHORIZED');
+SET request.jwt.claim.sub='00000000-0000-0000-0000-000000000201';
+SET request.jwt.claim.role='anon';
+SELECT lab_expect_error('JWT role required despite user identity', $$SELECT update_presentation_item_admin_decision(lab_uuid(61),'approved')$$,'UNAUTHORIZED');
+SET request.jwt.claim.role='authenticated';
+SELECT lab_expect_error('owner cannot operate foreign workspace', $$SELECT update_presentation_item_admin_decision(lab_uuid(63),'approved')$$,'UNAUTHORIZED');
+SELECT lab_expect_error('invalid admin status', $$SELECT update_presentation_item_admin_decision(lab_uuid(61),'invalid')$$,'INVALID_DECISION_STATUS');
+SELECT lab_assert('owner can approve',update_presentation_item_admin_decision(lab_uuid(61),'approved')->>'client_approval_status'='approved');
+SET request.jwt.claim.sub='00000000-0000-0000-0000-000000000202';
+SELECT lab_assert('admin can approve and preserve notes',update_presentation_item_admin_decision(lab_uuid(62),'approved')->>'presentation_status'='approved');
+RESET ROLE;
+SELECT lab_assert('all approved presentation terminal', (SELECT status='approved' FROM presentations WHERE id=lab_uuid(41)));
+SELECT lab_assert('failed cross-tenant requests left foreign item pending', (SELECT client_approval_status='pending' FROM presentation_items WHERE id=lab_uuid(63)));
+
+-- A later approved round must protect the shared content from an older decision.
+SET ROLE authenticated;
+SET request.jwt.claim.role='authenticated';
+SET request.jwt.claim.sub='00000000-0000-0000-0000-000000000201';
+SELECT lab_assert('later round approved',update_presentation_item_admin_decision(lab_uuid(65),'approved')->>'client_approval_status'='approved');
+SELECT lab_assert('older round rejection succeeds',update_presentation_item_admin_decision(lab_uuid(61),'rejected','old feedback')->>'client_approval_status'='rejected');
+RESET ROLE;
+SELECT lab_assert('newer approval prevents downgrade', (SELECT editorial_status='approved' AND approved_at IS NOT NULL FROM contents WHERE id=lab_uuid(31)));
+SET ROLE authenticated;
+SELECT lab_assert('later round can reopen',update_presentation_item_admin_decision(lab_uuid(65),'pending')->>'client_approval_status'='pending');
+RESET ROLE;
+-- Only an actual remaining approval protects reopening; after rejecting the old item there is none.
+SELECT lab_assert('last approval reopened clears content', (SELECT editorial_status='in_production' AND approved_at IS NULL FROM contents WHERE id=lab_uuid(31)));
+UPDATE contents SET editorial_status='cancelled' WHERE id=lab_uuid(32);
+SET ROLE authenticated;
+SELECT lab_assert('decision on cancelled content recorded',update_presentation_item_admin_decision(lab_uuid(62),'approved')->>'client_approval_status'='approved');
+RESET ROLE;
+SELECT lab_assert('cancelled content preserved',(SELECT editorial_status='cancelled' FROM contents WHERE id=lab_uuid(32)));
+UPDATE contents SET editorial_status='approved',approved_at=now(),published_at=now() WHERE id=lab_uuid(31);
+SET ROLE authenticated;
+SELECT lab_assert('published content rejection recorded',update_presentation_item_admin_decision(lab_uuid(61),'rejected','feedback')->>'client_approval_status'='rejected');
+RESET ROLE;
+SELECT lab_assert('published content not downgraded',(SELECT editorial_status='approved' AND approved_at IS NOT NULL FROM contents WHERE id=lab_uuid(31)));
+UPDATE presentations SET status='archived' WHERE id=lab_uuid(41);
+SET ROLE authenticated;
+SELECT lab_assert('archived presentation retained',update_presentation_item_admin_decision(lab_uuid(61),'pending')->>'presentation_status'='archived');
+RESET ROLE;
+
+-- The implementation also checks relation integrity rather than trusting caller IDs.
+SELECT lab_expect_error('real item trigger rejects client mismatch', $$UPDATE presentation_items SET content_id=lab_uuid(33) WHERE id=lab_uuid(61)$$,'PRESENTATION_ITEM_CLIENT_MISMATCH');
+SELECT lab_expect_error('real lineage trigger rejects foreign predecessor', $$UPDATE presentations SET previous_presentation_id=lab_uuid(42) WHERE id=lab_uuid(44)$$,'PRESENTATION_LINEAGE_CLIENT_MISMATCH');
+SELECT lab_expect_error('real series trigger rejects foreign series', $$UPDATE presentations SET presentation_series_id=lab_uuid(41) WHERE id=lab_uuid(42)$$,'PRESENTATION_SERIES_CLIENT_MISMATCH');
+-- Construct a corrupt legacy row only in this disposable local transaction.
+ALTER TABLE presentation_items DISABLE TRIGGER trg_presentation_item_client_integrity;
+UPDATE presentation_items SET content_id=lab_uuid(33) WHERE id=lab_uuid(61);
+ALTER TABLE presentation_items ENABLE TRIGGER trg_presentation_item_client_integrity;
+SET ROLE anon;
+SET request.jwt.claim.role='anon';
+SET request.jwt.claim.sub='';
+SELECT lab_expect_error('mismatched content client rejected', $$SELECT submit_public_presentation_decision(repeat('a',64),lab_uuid(61),'approved')$$,'INVALID_ITEM');
+RESET ROLE;
+SET ROLE service_role;
+SET request.jwt.claim.role='service_role';
+SET request.jwt.claim.sub='';
+SELECT lab_assert('trusted service role explicit path',update_presentation_item_admin_decision(lab_uuid(63),'approved')->>'client_approval_status'='approved');
+RESET ROLE;
+\ir ../../supabase/migrations/20261009234515_restore_presentation_decision_rpcs.sql
+SELECT lab_assert('reapply migration preserves explicit ACL',NOT has_function_privilege('authenticated','public.reconcile_presentation_item_decision(uuid,text,text,text,boolean)','EXECUTE'));
+ROLLBACK;
