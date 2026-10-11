@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Client, ClientStatus, UpdateClientInput } from '../../../types/clients';
 import { STATUS_CONFIG, formatCurrency, formatDate } from '../ClientStatusBadge';
+import { parseOptionalClientAmount } from '../../../services/clientsService';
 
 interface ClientProfileEditModalProps {
   isOpen: boolean;
@@ -36,6 +37,9 @@ export const ClientProfileEditModal: React.FC<ClientProfileEditModalProps> = ({
   isSaving,
   error,
 }) => {
+  const isManual = !client.origin_contract_id && !client.origin_opportunity_id;
+  const [monthlyAmount, setMonthlyAmount] = useState('');
+  const [oneTimeAmount, setOneTimeAmount] = useState('');
   const [formData, setFormData] = useState<UpdateClientInput>({
     name: client.name || '',
     commercial_name: client.commercial_name || '',
@@ -54,6 +58,8 @@ export const ClientProfileEditModal: React.FC<ClientProfileEditModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      setMonthlyAmount(client.monthly_amount == null ? '' : String(client.monthly_amount).replace('.', ','));
+      setOneTimeAmount(client.one_time_amount == null ? '' : String(client.one_time_amount).replace('.', ','));
       setFormData({
         name: client.name || '',
         commercial_name: client.commercial_name || '',
@@ -95,6 +101,15 @@ export const ClientProfileEditModal: React.FC<ClientProfileEditModalProps> = ({
       contract_start_date: formData.contract_start_date || null,
       contract_end_date: formData.contract_end_date || null,
     };
+    if (isManual) {
+      try {
+        payload.monthly_amount = parseOptionalClientAmount(monthlyAmount);
+        payload.one_time_amount = parseOptionalClientAmount(oneTimeAmount);
+      } catch (failure) {
+        setValidationError(failure instanceof Error ? failure.message : 'Valor comercial inválido.');
+        return;
+      }
+    }
 
     const success = await onSave(payload);
     if (success) {
@@ -298,32 +313,33 @@ export const ClientProfileEditModal: React.FC<ClientProfileEditModalProps> = ({
             </div>
           </div>
 
-          {/* Seção 4: Valores Financeiros e Origem Comercial (Somente Leitura) */}
+          {/* Manual commercial terms are editable; converted origin values remain read-only. */}
           <div className="space-y-3 bg-[#FAFAFA] border border-[#E8E9EA] rounded-xl p-4 text-xs">
             <div className="flex items-center gap-2 pb-2 border-b border-[#E8E9EA]">
               <ShieldCheck className="w-4 h-4 text-[#F15A3C]" />
               <span className="font-bold text-[#1D1D1D] text-xs">
-                Dados Comerciais & Financeiros de Origem (Somente Leitura)
+                {isManual ? 'Condições Comerciais do Cliente' : 'Dados Comerciais & Financeiros de Origem (Somente Leitura)'}
               </span>
             </div>
+            {isManual && <p className="text-[10px] text-[#666668]">Valores em reais, sem separador de milhar. Campo vazio significa valor não informado. Não gera cobranças ou pagamentos automaticamente.</p>}
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
               <div>
                 <span className="text-[10px] text-[#666668] block">Mensalidade</span>
-                <span className="font-bold text-[#1D1D1D] block mt-0.5">
+                {isManual ? <input aria-label="Mensalidade (R$)" inputMode="decimal" value={monthlyAmount} onChange={event => setMonthlyAmount(event.target.value)} disabled={isSaving} placeholder="Ex.: 1600,00" className="mt-1 w-full rounded-lg border border-[#E8E9EA] bg-white px-2 py-2 text-xs" /> : <span className="font-bold text-[#1D1D1D] block mt-0.5">
                   {client.monthly_amount !== null && client.monthly_amount !== undefined
                     ? `${formatCurrency(client.monthly_amount)}/mês`
                     : '—'}
-                </span>
+                </span>}
               </div>
 
               <div>
                 <span className="text-[10px] text-[#666668] block">Setup / Pontual</span>
-                <span className="font-bold text-[#1D1D1D] block mt-0.5">
+                {isManual ? <input aria-label="Setup / Pontual (R$)" inputMode="decimal" value={oneTimeAmount} onChange={event => setOneTimeAmount(event.target.value)} disabled={isSaving} placeholder="Ex.: 500,00" className="mt-1 w-full rounded-lg border border-[#E8E9EA] bg-white px-2 py-2 text-xs" /> : <span className="font-bold text-[#1D1D1D] block mt-0.5">
                   {client.one_time_amount !== null && client.one_time_amount !== undefined
                     ? formatCurrency(client.one_time_amount)
                     : '—'}
-                </span>
+                </span>}
               </div>
 
               <div>

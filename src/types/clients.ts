@@ -66,6 +66,8 @@ export interface ClientMetrics {
 }
 
 export interface UpdateClientInput {
+  monthly_amount?: number | null;
+  one_time_amount?: number | null;
   name?: string;
   commercial_name?: string | null;
   segment?: string | null;
@@ -80,6 +82,8 @@ export interface UpdateClientInput {
 }
 
 export interface CreateClientInput {
+  monthly_amount?: number | null;
+  one_time_amount?: number | null;
   name: string;
   commercial_name?: string;
   segment?: string;

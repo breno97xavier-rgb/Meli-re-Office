@@ -1,9 +1,30 @@
 import { supabase } from '../lib/supabase';
 import type { Client, CreateClientInput, UpdateClientInput } from '../types/clients';
 
+export function parseOptionalClientAmount(value: string): number | null {
+  const text = value.trim();
+  if (!text) return null;
+  if (!/^\d+(?:[.,]\d{1,2})?$/.test(text)) {
+    throw new Error('Informe um valor positivo ou zero, com até duas casas decimais e sem separador de milhar.');
+  }
+  return validateClientAmount(Number(text.replace(',', '.')));
+}
+
+function validateClientAmount(value: number | null): number | null {
+  if (value === null) return null;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 ||
+      !Number.isSafeInteger(Math.round(value * 100)) || Math.abs(value * 100 - Math.round(value * 100)) > 0.000001) {
+    throw new Error('Valor comercial inválido. Utilize até duas casas decimais e não informe valores negativos.');
+  }
+  return value;
+}
+
 export async function createManualClient(input: CreateClientInput): Promise<Client> {
   const name = input.name.trim();
   if (!name) throw new Error('Informe o nome do cliente.');
+  const amounts: Record<string, number | null> = {};
+  if (input.monthly_amount !== undefined) amounts.monthly_amount = validateClientAmount(input.monthly_amount);
+  if (input.one_time_amount !== undefined) amounts.one_time_amount = validateClientAmount(input.one_time_amount);
   const { data: identity, error: identityError } = await supabase.auth.getUser();
   if (identityError || !identity.user) throw new Error('Entre na sua conta para cadastrar um cliente.');
   const { data: memberships, error: membershipError } = await supabase
@@ -24,6 +45,7 @@ export async function createManualClient(input: CreateClientInput): Promise<Clie
   const slugBase = commercialName.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'cliente';
   const payload = {
+    ...amounts,
     workspace_id: workspaces[0], name, commercial_name: commercialName,
     slug: `${slugBase}-${crypto.randomUUID()}`, status: 'onboarding',
     segment: input.segment?.trim() || null, phone: input.phone?.trim() || null,
@@ -161,7 +183,7 @@ export async function updateClient(
     throw new Error('ID do cliente é obrigatório.');
   }
 
-  // Only allow editing safe basic/registration/status fields
+  // Financial edits are restricted atomically to clients without commercial origins.
   const payload: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   };
@@ -177,12 +199,16 @@ export async function updateClient(
   if (input.status !== undefined) payload.status = input.status;
   if (input.contract_start_date !== undefined) payload.contract_start_date = input.contract_start_date || null;
   if (input.contract_end_date !== undefined) payload.contract_end_date = input.contract_end_date || null;
+  const editsAmounts = input.monthly_amount !== undefined || input.one_time_amount !== undefined;
+  if (input.monthly_amount !== undefined) payload.monthly_amount = validateClientAmount(input.monthly_amount);
+  if (input.one_time_amount !== undefined) payload.one_time_amount = validateClientAmount(input.one_time_amount);
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('clients')
     .update(payload)
-    .eq('id', clientId)
-    .select(`
+    .eq('id', clientId);
+  if (editsAmounts) query = query.is('origin_contract_id', null).is('origin_opportunity_id', null);
+  const { data, error } = await query.select(`
       id,
       name,
       commercial_name,
@@ -209,6 +235,9 @@ export async function updateClient(
     .single();
 
   if (error) {
+    if (editsAmounts && error.code === 'PGRST116') {
+      throw new Error('Cliente não encontrado, sem permissão ou com origem comercial. Atualize o perfil; valores de origem são somente leitura.');
+    }
     console.error('Error updating client:', error);
     throw new Error(error.message || 'Erro ao atualizar dados do cliente.');
   }
