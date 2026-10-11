@@ -32,6 +32,13 @@ const ALLOWED_PRIORITY_CHANNELS: PrimaryChannel[] = [
   'other',
 ];
 
+function validateContentCount(value: number): number {
+  if (!Number.isInteger(value) || value < 0 || value > 2147483647) {
+    throw new Error('A meta de conteúdos deve ser um número inteiro entre 0 e 2147483647.');
+  }
+  return value;
+}
+
 export function formatPlanningError(error: unknown): string {
   if (!error) return 'Ocorreu um erro desconhecido.';
   const errObj = error as { message?: string; details?: string; hint?: string; code?: string };
@@ -617,7 +624,7 @@ export async function createEditorialPlan(
     throw new Error('A data final deve ser igual ou posterior à data inicial.');
   }
 
-  const targetPosts = typeof input.target_posts_count === 'number' ? Math.max(0, input.target_posts_count) : 0;
+  const targetPosts = input.target_posts_count === undefined ? 0 : validateContentCount(input.target_posts_count);
 
   // Sanitiza e deduplica secondary_goals
   const secondaryGoals = Array.isArray(input.secondary_goals)
@@ -726,11 +733,8 @@ export async function updateEditorialPlan(
     payload.core_message = input.core_message?.trim() || null;
   }
 
-  if (typeof input.target_posts_count === 'number') {
-    if (input.target_posts_count < 0) {
-      throw new Error('A meta total de conteúdos deve ser maior ou igual a zero.');
-    }
-    payload.target_posts_count = input.target_posts_count;
+  if (input.target_posts_count !== undefined) {
+    payload.target_posts_count = validateContentCount(input.target_posts_count);
   }
 
   if (input.status !== undefined) {
@@ -858,13 +862,9 @@ export async function setEditorialPlanPillars(
     }
     seenPillars.add(alloc.pillar_id);
 
-    if (typeof alloc.target_count !== 'number' || isNaN(alloc.target_count) || alloc.target_count < 0) {
-      throw new Error('A meta de conteúdos por pilar deve ser um número maior ou igual a zero.');
-    }
-
     payloadAllocations.push({
       pillar_id: alloc.pillar_id,
-      target_count: Math.floor(alloc.target_count),
+      target_count: validateContentCount(alloc.target_count),
     });
   }
 
