@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   DollarSign,
   RefreshCw,
+  Plus,
 } from 'lucide-react';
 import { ClientMetrics } from '../../types/clients';
 import { formatCurrency } from './ClientStatusBadge';
@@ -15,12 +16,14 @@ interface ClientsHeaderProps {
   metrics: ClientMetrics;
   loading: boolean;
   onRefresh: () => void;
+  onCreate?: () => void;
 }
 
 export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
   metrics,
   loading,
   onRefresh,
+  onCreate,
 }) => {
   return (
     <div id="clients-header" className="space-y-6">
@@ -36,6 +39,9 @@ export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5 self-start sm:self-auto">
+          {onCreate && <button type="button" onClick={onCreate} className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-[#1D1D1D] rounded-lg hover:bg-[#333] transition-colors cursor-pointer">
+            <Plus className="w-3.5 h-3.5 text-[#F15A3C]" /> Novo cliente
+          </button>}
           <button
             id="btn-refresh-clients"
             onClick={onRefresh}

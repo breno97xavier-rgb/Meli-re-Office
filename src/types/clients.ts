@@ -79,6 +79,15 @@ export interface UpdateClientInput {
   contract_end_date?: string | null;
 }
 
+export interface CreateClientInput {
+  name: string;
+  commercial_name?: string;
+  segment?: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+}
+
 export interface ClientOpportunityItem {
   id: string;
   title: string;

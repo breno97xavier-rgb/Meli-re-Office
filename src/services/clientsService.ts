@@ -1,5 +1,41 @@
 import { supabase } from '../lib/supabase';
-import { Client, UpdateClientInput } from '../types/clients';
+import type { Client, CreateClientInput, UpdateClientInput } from '../types/clients';
+
+export async function createManualClient(input: CreateClientInput): Promise<Client> {
+  const name = input.name.trim();
+  if (!name) throw new Error('Informe o nome do cliente.');
+  const { data: identity, error: identityError } = await supabase.auth.getUser();
+  if (identityError || !identity.user) throw new Error('Entre na sua conta para cadastrar um cliente.');
+  const { data: memberships, error: membershipError } = await supabase
+    .from('workspace_members')
+    .select('workspace_id, workspace:workspaces!inner(id, status)')
+    .eq('user_id', identity.user.id)
+    .eq('status', 'active')
+    .in('role', ['owner', 'admin'])
+    .eq('workspace.status', 'active');
+  if (membershipError) throw new Error('Não foi possível confirmar a agência vinculada à sua conta.');
+  const workspaces = [...new Set((memberships || []).map(row => row.workspace_id))];
+  if (workspaces.length !== 1) {
+    throw new Error(workspaces.length === 0
+      ? 'Sua conta precisa estar vinculada como administrador a uma agência ativa.'
+      : 'Sua conta possui mais de uma agência ativa. O cadastro precisa de um workspace definido.');
+  }
+  const commercialName = input.commercial_name?.trim() || name;
+  const slugBase = commercialName.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'cliente';
+  const payload = {
+    workspace_id: workspaces[0], name, commercial_name: commercialName,
+    slug: `${slugBase}-${crypto.randomUUID()}`, status: 'onboarding',
+    segment: input.segment?.trim() || null, phone: input.phone?.trim() || null,
+    email: input.email?.trim() || null, notes: input.notes?.trim() || null,
+  };
+  const { data, error } = await supabase.from('clients').insert(payload).select('*').single();
+  if (error) throw new Error(error.code === '42501'
+    ? 'Sua conta não tem permissão para cadastrar clientes.'
+    : 'Não foi possível salvar o cliente. Tente novamente.');
+  if (!data) throw new Error('O cadastro não retornou confirmação. Atualize a lista antes de tentar novamente.');
+  return normalizeClient(data);
+}
 
 export function formatClientError(error: unknown): string {
   if (!error) return 'Ocorreu um erro desconhecido.';

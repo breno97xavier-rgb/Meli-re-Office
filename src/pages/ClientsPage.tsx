@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { CreateClientModal } from '../components/clients/CreateClientModal';
 import { AlertCircle } from 'lucide-react';
 import { ClientsHeader } from '../components/clients/ClientsHeader';
 import { ClientsTable } from '../components/clients/ClientsTable';
@@ -10,6 +11,7 @@ interface ClientsPageProps {
 }
 
 export const ClientsPage: React.FC<ClientsPageProps> = ({ onNavigate }) => {
+  const [creating, setCreating] = useState(false);
   const {
     clients,
     allClients,
@@ -62,7 +64,14 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ onNavigate }) => {
         metrics={metrics}
         loading={loading}
         onRefresh={loadClients}
+        onCreate={() => setCreating(true)}
       />
+      {creating && <CreateClientModal onClose={() => setCreating(false)} onCreated={() => {
+        setCreating(false);
+        setStatusFilter('all');
+        setSearchTerm('');
+        void loadClients();
+      }} />}
 
       {/* Clients Table with Filter Tabs & Search */}
       <ClientsTable
