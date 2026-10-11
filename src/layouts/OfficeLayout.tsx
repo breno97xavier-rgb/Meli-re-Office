@@ -7,9 +7,10 @@ interface OfficeLayoutProps {
   currentPath: RoutePath;
   onNavigate: (path: RoutePath) => void;
   children: ReactNode;
+  onCreate?: () => void;
 }
 
-export function OfficeLayout({ currentPath, onNavigate, children }: OfficeLayoutProps) {
+export function OfficeLayout({ currentPath, onNavigate, children, onCreate }: OfficeLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -36,6 +37,7 @@ export function OfficeLayout({ currentPath, onNavigate, children }: OfficeLayout
           currentPath={currentPath}
           onOpenMobileMenu={() => setIsMobileOpen(true)}
           isCollapsed={isCollapsed}
+          onCreate={onCreate}
         />
 
         {/* Page Main Content Area */}

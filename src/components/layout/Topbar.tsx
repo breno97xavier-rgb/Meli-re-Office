@@ -7,6 +7,7 @@ interface TopbarProps {
   currentPath: RoutePath;
   onOpenMobileMenu: () => void;
   isCollapsed: boolean;
+  onCreate?: () => void;
 }
 
 const ROLE_LABEL_MAP: Record<UserRole, string> = {
@@ -15,7 +16,7 @@ const ROLE_LABEL_MAP: Record<UserRole, string> = {
   client: 'Cliente',
 };
 
-export function Topbar({ currentPath, onOpenMobileMenu, isCollapsed: _isCollapsed }: TopbarProps) {
+export function Topbar({ currentPath, onOpenMobileMenu, isCollapsed: _isCollapsed, onCreate }: TopbarProps) {
   const { profile, signOut } = useAuth();
 
   const currentItem = (() => {
@@ -102,12 +103,14 @@ export function Topbar({ currentPath, onOpenMobileMenu, isCollapsed: _isCollapse
           />
         </div>
 
-        {/* Quick Action Button (Neutral / Future placeholder) */}
+        {/* Contextual quick action: client registration is available in the MVP. */}
         <button
           type="button"
-          disabled
-          className="hidden sm:inline-flex h-8 items-center gap-1.5 rounded-md border border-[#E8E9EA] bg-white px-2.5 text-xs font-medium text-[#9E9EA0] opacity-70 cursor-not-allowed"
-          title="Ação rápida (disponível em fases futuras)"
+          disabled={!onCreate}
+          onClick={onCreate}
+          className={`${onCreate ? 'inline-flex text-[#1D1D1D] hover:border-[#FBC3B8] hover:bg-[#FDF1EE] cursor-pointer' : 'hidden sm:inline-flex text-[#9E9EA0] opacity-70 cursor-not-allowed'} h-8 items-center gap-1.5 rounded-md border border-[#E8E9EA] bg-white px-2.5 text-xs font-medium`}
+          title={onCreate ? 'Cadastrar novo cliente' : 'Ação rápida (disponível em fases futuras)'}
+          aria-label={onCreate ? 'Cadastrar novo cliente' : 'Novo (indisponível neste módulo)'}
         >
           <Plus className="h-3.5 w-3.5" />
           <span>Novo</span>

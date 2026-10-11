@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AuthProvider } from '@/src/context/AuthContext';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useRouter } from '@/src/hooks/useRouter';
@@ -25,6 +25,8 @@ import { PublicPresentationPage } from '@/src/pages/PublicPresentationPage';
 function AppContent() {
   const { user, profile, isLoading, isUnauthorized, signOut } = useAuth();
   const { currentPath, navigate } = useRouter();
+  const [creatingClient, setCreatingClient] = useState(false);
+  useEffect(() => { setCreatingClient(false); }, [currentPath]);
 
   // 0. PUBLIC ROUTES: Public Presentation (/apresentacao/:token)
   // Accessible anonymously without authentication, without OfficeLayout, without admin guards
@@ -81,7 +83,7 @@ function AppContent() {
       case '/comercial/contratos':
         return <ContractsPage />;
       case '/clientes':
-        return <ClientsPage onNavigate={navigate} />;
+        return <ClientsPage onNavigate={navigate} isCreating={creatingClient} onCloseCreate={() => setCreatingClient(false)} />;
       case '/planejamento':
         return <PlanningPage />;
       case '/conteudos':
@@ -108,7 +110,8 @@ function AppContent() {
   };
 
   return (
-    <OfficeLayout currentPath={currentPath === '/login' ? '/dashboard' : currentPath} onNavigate={navigate}>
+    <OfficeLayout currentPath={currentPath === '/login' ? '/dashboard' : currentPath} onNavigate={navigate}
+      onCreate={currentPath === '/clientes' ? () => setCreatingClient(true) : undefined}>
       {renderContent()}
     </OfficeLayout>
   );

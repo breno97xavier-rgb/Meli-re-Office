@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { CreateClientModal } from '../components/clients/CreateClientModal';
 import { AlertCircle } from 'lucide-react';
 import { ClientsHeader } from '../components/clients/ClientsHeader';
@@ -8,10 +8,11 @@ import { useClients } from '../hooks/useClients';
 
 interface ClientsPageProps {
   onNavigate?: (path: string) => void;
+  isCreating: boolean;
+  onCloseCreate: () => void;
 }
 
-export const ClientsPage: React.FC<ClientsPageProps> = ({ onNavigate }) => {
-  const [creating, setCreating] = useState(false);
+export const ClientsPage: React.FC<ClientsPageProps> = ({ onNavigate, isCreating, onCloseCreate }) => {
   const {
     clients,
     allClients,
@@ -64,10 +65,9 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({ onNavigate }) => {
         metrics={metrics}
         loading={loading}
         onRefresh={loadClients}
-        onCreate={() => setCreating(true)}
       />
-      {creating && <CreateClientModal onClose={() => setCreating(false)} onCreated={() => {
-        setCreating(false);
+      {isCreating && <CreateClientModal onClose={onCloseCreate} onCreated={() => {
+        onCloseCreate();
         setStatusFilter('all');
         setSearchTerm('');
         void loadClients();
