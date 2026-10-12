@@ -111,7 +111,7 @@ export const ClientProfileTabs: React.FC<ClientProfileTabsProps> = ({
       key: 'tasks',
       label: 'Tarefas',
       icon: CheckSquare,
-      isFunctional: false,
+      isFunctional: true,
     },
     {
       key: 'notes',

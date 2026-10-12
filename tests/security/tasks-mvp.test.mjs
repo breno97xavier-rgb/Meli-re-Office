@@ -73,6 +73,12 @@ test('task and minimal client selectors share the same workspace', async () => {
   for(const table of ['tasks','clients']) assert.ok(calls.find(call=>call.table===table).filters.some(([column,value])=>column==='workspace_id'&&value==='workspace-a'));
   assert.equal(calls.find(call=>call.table==='clients').columns,'id,name,commercial_name');
 });
+test('client profile filters tasks on the server without removing workspace scope', async () => {
+  const {service,calls}=await load(); await service.fetchTasksData(input.client_id);
+  const filters=calls.find(call=>call.table==='tasks').filters;
+  assert.ok(filters.some(([column,value])=>column==='workspace_id'&&value==='workspace-a'));
+  assert.ok(filters.some(([column,value])=>column==='client_id'&&value===input.client_id));
+});
 test('internal tasks and empty descriptions preserve explicit nulls', async () => {
   const {service}=await load(); const result=await service.createTask({...input,client_id:null,due_date:null,description:' '});
   assert.equal(result.client_id,null); assert.equal(result.due_date,null); assert.equal(result.description,null);

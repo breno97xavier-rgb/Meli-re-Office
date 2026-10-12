@@ -14,6 +14,7 @@ interface CalendarDayCellProps {
   showClientName?: boolean;
   movingContentIds?: string[];
   isDraggable?: boolean;
+  taskCards?: React.ReactNode;
 }
 
 const MAX_VISIBLE_CARDS = 3;
@@ -27,6 +28,7 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   showClientName = true,
   movingContentIds = [],
   isDraggable = true,
+  taskCards,
 }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: day.date,
@@ -127,6 +129,7 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
             isMoving={movingContentIds.includes(content.id)}
           />
         ))}
+        {taskCards}
       </div>
 
       {/* 3. Overflow indicator button */}

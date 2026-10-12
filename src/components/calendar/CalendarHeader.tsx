@@ -47,10 +47,10 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           className="text-xl md:text-2xl font-bold text-[#1D1D1D] tracking-tight flex items-center gap-2.5"
         >
           <CalendarIcon className="w-6 h-6 text-[#1D1D1D]" />
-          <span>Calendário Editorial</span>
+          <span>Calendário</span>
         </h1>
         <p className="text-xs md:text-sm text-[#666668] mt-0.5">
-          Visualize a distribuição temporal dos conteúdos planejados.
+          Acompanhe conteúdos planejados e prazos das tarefas da agência.
         </p>
       </div>
 
@@ -61,7 +61,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           <span className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-[#1D1D1D] bg-white border border-[#E8E9EA] rounded-lg shadow-2xs">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             <span>
-              <strong>{totalPlannedInMonth}</strong> no mês
+              <strong>{totalPlannedInMonth}</strong> conteúdos no mês
             </span>
           </span>
 

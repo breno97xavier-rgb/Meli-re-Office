@@ -19,6 +19,7 @@ import { ClientContentsSection } from '../components/clients/profile/ClientConte
 import { ClientPresentationsSection } from '../components/clients/profile/ClientPresentationsSection';
 import { ClientPlaceholderSection } from '../components/clients/profile/ClientPlaceholderSection';
 import { ClientProfileEditModal } from '../components/clients/profile/ClientProfileEditModal';
+import { TasksPage } from './TasksPage';
 
 interface ClientProfilePageProps {
   clientId: string;
@@ -160,11 +161,15 @@ export const ClientProfilePage: React.FC<ClientProfilePageProps> = ({
         {activeTab === 'presentations' && (
           <ClientPresentationsSection client={client} onNavigate={onNavigate} />
         )}
+        {activeTab === 'tasks' && (
+          <TasksPage key={client.id} initialClientId={client.id} onCloseCreate={() => {}} />
+        )}
 
         {activeTab !== 'overview' &&
           activeTab !== 'contacts' &&
           activeTab !== 'commercial' &&
           activeTab !== 'contents' &&
+          activeTab !== 'tasks' &&
           activeTab !== 'presentations' && (
             <ClientPlaceholderSection tabKey={activeTab} />
           )}

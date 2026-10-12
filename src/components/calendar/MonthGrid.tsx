@@ -1,6 +1,8 @@
 import React from 'react';
 import { CalendarGridDay, parseCivilDate, getMonthName, getWeekdayNames } from '../../utils/civilDate';
 import { Content } from '../../types/contents';
+import type { Task } from '../../types/tasks';
+import { CalendarTaskCard } from './CalendarTaskCard';
 import { CalendarDayCell } from './CalendarDayCell';
 import { CalendarContentCardVisual } from './CalendarContentCardVisual';
 import { CalendarDayOverflowModal } from './CalendarDayOverflowModal';
@@ -18,6 +20,10 @@ interface MonthGridProps {
   onCreateContent?: (dateKey: string) => void;
   showClientName?: boolean;
   movingContentIds?: string[];
+  tasksByDate?: Record<string, Task[]>;
+  tasksInMonth?: number;
+  taskClientNames?: Record<string, string>;
+  onSelectTask?: (task: Task) => void;
 }
 
 export const MonthGrid: React.FC<MonthGridProps> = ({
@@ -32,6 +38,10 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
   onCreateContent,
   showClientName = true,
   movingContentIds = [],
+  tasksByDate = {},
+  tasksInMonth = 0,
+  taskClientNames = {},
+  onSelectTask,
 }) => {
   const weekdaysShort = getWeekdayNames('short');
 
@@ -85,13 +95,13 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
 
   // Identificação de dias com conteúdos para visualização mobile (Agenda)
   const mobileDaysWithContents = gridDays.filter(
-    (day) => day.isCurrentMonth && (contentsByDate[day.date]?.length || 0) > 0
+    (day) => day.isCurrentMonth && ((contentsByDate[day.date]?.length || 0) + (tasksByDate[day.date]?.length || 0)) > 0
   );
 
   return (
     <div className="space-y-4">
       {/* Aviso contextual se mês estiver vazio ou filtros sem resultado */}
-      {monthContents.length === 0 && (
+      {monthContents.length === 0 && tasksInMonth === 0 && (
         <div className="p-4 bg-[#F7F7F8] border border-[#E8E9EA] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#666668]">
           <div className="flex items-center gap-2.5">
             {isFilterActive ? (
@@ -101,8 +111,8 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
             )}
             <span>
               {isFilterActive
-                ? 'Nenhum conteúdo corresponde aos filtros selecionados para este mês.'
-                : 'Nenhum conteúdo planejado para este mês.'}
+                ? 'Nenhuma atividade corresponde aos filtros selecionados para este mês.'
+                : 'Nenhuma atividade com data para este mês.'}
             </span>
           </div>
           {isFilterActive && (
@@ -154,6 +164,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
                   showClientName={showClientName}
                   movingContentIds={movingContentIds}
                   isDraggable={true}
+                  taskCards={onSelectTask && (tasksByDate[day.date] || []).map(task => <CalendarTaskCard key={task.id} task={task} clientName={taskClientNames[task.client_id || '']} onSelect={onSelectTask} />)}
                 />
               );
             })}
@@ -203,6 +214,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-medium text-[#666668]">
                       {dayContents.length} {dayContents.length === 1 ? 'conteúdo' : 'conteúdos'}
+                      {Boolean(tasksByDate[day.date]?.length) && ` · ${tasksByDate[day.date].length} tarefa(s)`}
                     </span>
                     {onCreateContent && (
                       <button
@@ -229,6 +241,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
                       showClientName={showClientName}
                     />
                   ))}
+                  {onSelectTask && (tasksByDate[day.date] || []).map(task => <CalendarTaskCard key={task.id} task={task} clientName={taskClientNames[task.client_id || '']} onSelect={onSelectTask} />)}
                 </div>
               </div>
             );
@@ -240,7 +253,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
             </div>
             <div>
               <p className="text-sm font-bold text-[#1D1D1D]">
-                Nenhum conteúdo planejado para os dias deste mês
+                Nenhuma atividade planejada para os dias deste mês
               </p>
               <p className="text-xs text-[#666668] mt-1">
                 {isFilterActive

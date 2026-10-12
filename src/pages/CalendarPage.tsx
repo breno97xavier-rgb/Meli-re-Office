@@ -12,6 +12,10 @@ import {
 } from '@dnd-kit/core';
 import { AlertCircle, RefreshCw, X } from 'lucide-react';
 import { useCalendarContents } from '../hooks/useCalendarContents';
+import { useCalendarTasks } from '../hooks/useCalendarTasks';
+import { projectCalendarTasks } from '../services/calendarTaskContracts';
+import { TaskEditor } from '../components/tasks/TaskEditor';
+import type { Task } from '../types/tasks';
 import { CalendarHeader } from '../components/calendar/CalendarHeader';
 import { CalendarFiltersBar } from '../components/calendar/CalendarFiltersBar';
 import { MonthGrid } from '../components/calendar/MonthGrid';
@@ -69,6 +73,11 @@ export const CalendarPage: React.FC = () => {
     handleUpdateStatus,
     handleSelectContent,
   } = useCalendarContents();
+  const calendarTasks = useCalendarTasks();
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [includeDoneTasks, setIncludeDoneTasks] = useState(false);
+  const taskClientNames = Object.fromEntries(calendarTasks.clients.map(client => [client.id, client.commercial_name || client.name]));
+  const taskProjection = projectCalendarTasks(calendarTasks.tasks, { year: visibleYear, month: visibleMonth, clientId: clientIdFilter, search: searchTerm, includeDone: includeDoneTasks, clientNames: taskClientNames });
 
   // Estado para o card em arrasto (DragOverlay)
   const [activeDragContent, setActiveDragContent] = useState<Content | null>(null);
@@ -175,7 +184,7 @@ export const CalendarPage: React.FC = () => {
           onPreviousMonth={previousMonth}
           onNextMonth={nextMonth}
           onGoToToday={goToToday}
-          onRefresh={loadContents}
+          onRefresh={() => { loadContents(); calendarTasks.reload(); }}
           onOpenBacklog={() => setIsBacklogOpen(true)}
           loading={loading}
           totalPlannedInMonth={metrics.totalPlannedInMonth}
@@ -252,6 +261,11 @@ export const CalendarPage: React.FC = () => {
         />
 
         {/* 5. Month Calendar Grid */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#E8E9EA] bg-white p-4 text-xs text-[#666668]">
+          <div className="space-y-1"><p className="font-semibold text-violet-800">Tarefas: {calendarTasks.loading ? 'Carregando…' : calendarTasks.error ? 'Indisponíveis' : `${taskProjection.monthCount} com prazo neste mês · ${taskProjection.undatedCount} sem prazo`}</p><p>Os filtros de formato, status editorial e canal se aplicam aos conteúdos. Cliente e busca também filtram tarefas.</p></div>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={includeDoneTasks} onChange={event => setIncludeDoneTasks(event.target.checked)} />Mostrar tarefas concluídas</label>
+        </div>
+        {calendarTasks.error && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{calendarTasks.error} <button type="button" onClick={calendarTasks.reload} className="underline">Tentar carregar tarefas novamente</button></div>}
         <MonthGrid
           gridDays={gridDays}
           contentsByDate={contentsByDate}
@@ -264,7 +278,12 @@ export const CalendarPage: React.FC = () => {
           onCreateContent={(dateKey) => setCreateModalDate(dateKey)}
           showClientName={clientIdFilter === 'all'}
           movingContentIds={movingContentIds}
+          tasksByDate={taskProjection.byDate}
+          tasksInMonth={taskProjection.monthCount}
+          taskClientNames={taskClientNames}
+          onSelectTask={setSelectedTask}
         />
+        {selectedTask && <TaskEditor key={selectedTask.id} task={selectedTask} clients={calendarTasks.clients} onClose={() => setSelectedTask(null)} onSave={async input => { await calendarTasks.save(selectedTask.id, input); setSelectedTask(null); }} />}
 
         {/* 6. Drag Overlay for smooth preview during drag (portal to document.body) */}
         {createPortal(

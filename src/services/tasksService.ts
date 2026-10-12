@@ -43,10 +43,12 @@ async function taskContext() {
   return { workspaceId: ids[0], userId: data.user.id };
 }
 
-export async function fetchTasksData(): Promise<{ tasks: Task[]; clients: TaskClient[] }> {
+export async function fetchTasksData(clientId?: string): Promise<{ tasks: Task[]; clients: TaskClient[] }> {
   const { workspaceId } = await taskContext();
+  let tasksQuery = supabase.from('tasks').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: false });
+  if (clientId) tasksQuery = tasksQuery.eq('client_id', clientId);
   const [tasks, clients] = await Promise.all([
-    supabase.from('tasks').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: false }),
+    tasksQuery,
     supabase.from('clients').select('id,name,commercial_name').eq('workspace_id', workspaceId).order('name'),
   ]);
   if (tasks.error || clients.error) throw new Error('Não foi possível carregar as tarefas e seus clientes.');
