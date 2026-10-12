@@ -109,8 +109,8 @@ export function Topbar({ currentPath, onOpenMobileMenu, isCollapsed: _isCollapse
           disabled={!onCreate}
           onClick={onCreate}
           className={`${onCreate ? 'inline-flex text-[#1D1D1D] hover:border-[#FBC3B8] hover:bg-[#FDF1EE] cursor-pointer' : 'hidden sm:inline-flex text-[#9E9EA0] opacity-70 cursor-not-allowed'} h-8 items-center gap-1.5 rounded-md border border-[#E8E9EA] bg-white px-2.5 text-xs font-medium`}
-          title={onCreate ? 'Cadastrar novo cliente' : 'Ação rápida (disponível em fases futuras)'}
-          aria-label={onCreate ? 'Cadastrar novo cliente' : 'Novo (indisponível neste módulo)'}
+          title={onCreate ? (currentPath === '/tarefas' ? 'Criar nova tarefa' : 'Cadastrar novo cliente') : 'Ação rápida (disponível em fases futuras)'}
+          aria-label={onCreate ? (currentPath === '/tarefas' ? 'Criar nova tarefa' : 'Cadastrar novo cliente') : 'Novo (indisponível neste módulo)'}
         >
           <Plus className="h-3.5 w-3.5" />
           <span>Novo</span>
