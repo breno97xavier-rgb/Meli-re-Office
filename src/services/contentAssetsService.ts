@@ -92,6 +92,20 @@ function getFileExtension(file: File): string {
   }
 }
 
+async function resolveAssetWorkspace(clientId: string, contentId: string): Promise<string> {
+  const { data: content, error: contentError } = await supabase.from('contents')
+    .select('client_id').eq('id', contentId).eq('client_id', clientId).single();
+  if (contentError || content?.client_id !== clientId) {
+    throw new Error('Conteúdo não encontrado ou não pertence ao cliente informado. Atualize a página antes de enviar o arquivo.');
+  }
+  const { data: client, error: clientError } = await supabase.from('clients')
+    .select('workspace_id').eq('id', clientId).single();
+  if (clientError || !client?.workspace_id) {
+    throw new Error('Cliente não encontrado ou workspace inválido para armazenamento.');
+  }
+  return client.workspace_id;
+}
+
 /**
  * Fetches all assets for a given content item, sorted by display_order ASC, version DESC.
  */
@@ -131,20 +145,23 @@ export async function uploadContentAsset(
   }
 
   validateAssetFile(file, assetType);
-
-  // 0. Resolve workspace_id from client relation
-  const { data: clientData, error: clientErr } = await supabase
-    .from('clients')
-    .select('workspace_id')
-    .eq('id', clientId)
-    .single();
-
-  if (clientErr || !clientData?.workspace_id) {
-    console.error('Error resolving workspace for client:', clientErr);
-    throw new Error('Cliente não encontrado ou workspace inválido para armazenamento.');
+  if (!['image', 'video', 'thumbnail'].includes(assetType)) {
+    throw new Error('Tipo de mídia inválido.');
   }
-
-  const workspaceId = clientData.workspace_id;
+  if (displayOrder !== undefined && (!Number.isInteger(displayOrder) || displayOrder < 0 || displayOrder > 2147483647)) {
+    throw new Error('A ordem do arquivo deve ser um número inteiro válido maior ou igual a zero.');
+  }
+  const workspaceId = await resolveAssetWorkspace(clientId, contentId);
+  // Resolve the order before upload. A failed read must not create an orphan or guess zero.
+  let finalDisplayOrder = displayOrder ?? 0;
+  if (displayOrder === undefined) {
+    const existing = await fetchContentAssets(contentId);
+    const currentOfSameType = existing.filter(a => a.is_current && a.asset_type === assetType);
+    if (currentOfSameType.length) finalDisplayOrder = Math.max(...currentOfSameType.map(a => a.display_order)) + 1;
+    if (!Number.isInteger(finalDisplayOrder) || finalDisplayOrder < 0 || finalDisplayOrder > 2147483647) {
+      throw new Error('Não foi possível determinar uma ordem válida para o arquivo.');
+    }
+  }
 
   // Generate canonical storage path: workspace/<workspace_id>/clients/<client_id>/contents/<content_id>/<uuid>.<ext>
   const fileUuid = crypto.randomUUID();
@@ -162,25 +179,6 @@ export async function uploadContentAsset(
   if (uploadError) {
     console.error('Storage upload error:', uploadError);
     throw new Error(uploadError.message || 'Falha no envio do arquivo para o Storage.');
-  }
-
-  // 2. Determine display order if not specified
-  let finalDisplayOrder = displayOrder ?? 0;
-  if (displayOrder === undefined) {
-    try {
-      const existing = await fetchContentAssets(contentId);
-      const currentOfSameType = existing.filter(
-        (a) => a.is_current && a.asset_type === assetType
-      );
-      if (currentOfSameType.length > 0) {
-        const maxOrder = Math.max(...currentOfSameType.map((a) => a.display_order));
-        finalDisplayOrder = maxOrder + 1;
-      } else {
-        finalDisplayOrder = 0;
-      }
-    } catch {
-      finalDisplayOrder = 0;
-    }
   }
 
   // 3. Insert metadata record in content_assets
@@ -251,28 +249,18 @@ export async function replaceContentAsset(
     .from('content_assets')
     .select('*')
     .eq('id', targetAssetId)
+    .eq('content_id', contentId)
+    .eq('is_current', true)
     .single();
 
-  if (fetchErr || !targetAsset) {
-    throw new Error('Asset original não encontrado para substituição.');
+  if (fetchErr || !targetAsset || targetAsset.content_id !== contentId || !targetAsset.is_current) {
+    throw new Error('Arquivo atual não encontrado neste conteúdo. Atualize a página antes de substituir.');
   }
 
   const assetType = targetAsset.asset_type as ContentAssetType;
   validateAssetFile(file, assetType);
 
-  // 0. Resolve workspace_id from client relation
-  const { data: clientData, error: clientErr } = await supabase
-    .from('clients')
-    .select('workspace_id')
-    .eq('id', clientId)
-    .single();
-
-  if (clientErr || !clientData?.workspace_id) {
-    console.error('Error resolving workspace for client:', clientErr);
-    throw new Error('Cliente não encontrado ou workspace inválido para armazenamento.');
-  }
-
-  const workspaceId = clientData.workspace_id;
+  const workspaceId = await resolveAssetWorkspace(clientId, contentId);
 
   // Generate canonical storage path: workspace/<workspace_id>/clients/<client_id>/contents/<content_id>/<uuid>.<ext>
   const fileUuid = crypto.randomUUID();
@@ -298,7 +286,11 @@ export async function replaceContentAsset(
     const { error: updateErr } = await supabase
       .from('content_assets')
       .update({ is_current: false })
-      .eq('id', targetAssetId);
+      .eq('id', targetAssetId)
+      .eq('content_id', contentId)
+      .eq('is_current', true)
+      .select('id')
+      .single();
 
     if (updateErr) {
       throw updateErr;
@@ -329,7 +321,8 @@ export async function replaceContentAsset(
       await supabase
         .from('content_assets')
         .update({ is_current: true })
-        .eq('id', targetAssetId);
+        .eq('id', targetAssetId)
+        .eq('content_id', contentId);
       throw insertErr;
     }
 
