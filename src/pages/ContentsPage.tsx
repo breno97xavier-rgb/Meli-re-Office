@@ -3,7 +3,7 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
 import { useContents } from '../hooks/useContents';
 import { ContentsHeader } from '../components/contents/ContentsHeader';
 import { ContentFiltersBar } from '../components/contents/ContentFiltersBar';
-import { ContentsTable } from '../components/contents/ContentsTable';
+import { ContentsFeed } from '../components/contents/ContentsFeed';
 import { CreateContentModal } from '../components/contents/CreateContentModal';
 import { ContentDetailDrawer } from '../components/contents/ContentDetailDrawer';
 
@@ -39,6 +39,7 @@ export const ContentsPage: React.FC = () => {
   } = useContents();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [mediaRevision, setMediaRevision] = useState(0);
 
   return (
     <div id="contents-page" className="p-6 md:p-8 space-y-6">
@@ -93,7 +94,8 @@ export const ContentsPage: React.FC = () => {
       />
 
       {/* 4. Editorial Contents Table */}
-      <ContentsTable
+      <ContentsFeed
+        revision={mediaRevision}
         contents={contents}
         loading={loading}
         onSelectContent={handleSelectContent}
@@ -124,6 +126,7 @@ export const ContentsPage: React.FC = () => {
         clients={clients}
         isSaving={isUpdating}
         error={updateError}
+        onAssetsChanged={() => setMediaRevision(revision => revision + 1)}
       />
     </div>
   );

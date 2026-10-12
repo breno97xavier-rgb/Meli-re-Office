@@ -18,12 +18,14 @@ interface ContentAssetsSectionProps {
   clientId?: string;
   contentId?: string;
   format: ContentFormat;
+  onAssetsChanged?: () => void;
 }
 
 export const ContentAssetsSection: React.FC<ContentAssetsSectionProps> = ({
   clientId,
   contentId,
   format,
+  onAssetsChanged,
 }) => {
   const {
     assets,
@@ -45,20 +47,25 @@ export const ContentAssetsSection: React.FC<ContentAssetsSectionProps> = ({
   } = useContentAssets(clientId, contentId);
 
   // Handlers for specific formats
+  async function notifyChange<T>(operation: Promise<T>): Promise<T> {
+    const result = await operation;
+    if (result) onAssetsChanged?.();
+    return result;
+  }
   const handleUploadImage = async (file: File) => {
-    return uploadAsset(file, 'image');
+    return notifyChange(uploadAsset(file, 'image'));
   };
 
   const handleUploadVideo = async (file: File) => {
-    return uploadAsset(file, 'video');
+    return notifyChange(uploadAsset(file, 'video'));
   };
 
   const handleUploadThumbnail = async (file: File) => {
-    return uploadAsset(file, 'thumbnail');
+    return notifyChange(uploadAsset(file, 'thumbnail'));
   };
 
   const handleReplaceAsset = async (targetAssetId: string, file: File) => {
-    return replaceAsset(targetAssetId, file);
+    return notifyChange(replaceAsset(targetAssetId, file));
   };
 
   const currentSingleImage = currentAssets.find(
@@ -145,8 +152,8 @@ export const ContentAssetsSection: React.FC<ContentAssetsSectionProps> = ({
               actionLoadingId={actionLoadingId}
               onUploadSlide={handleUploadImage}
               onReplaceSlide={handleReplaceAsset}
-              onReorderSlides={reorderSlides}
-              onRemoveSlide={removeSlide}
+              onReorderSlides={ids => notifyChange(reorderSlides(ids))}
+              onRemoveSlide={id => notifyChange(removeSlide(id))}
               onDownload={downloadAsset}
               uploadError={uploadError}
               onClearUploadError={() => setUploadError(null)}
@@ -163,7 +170,7 @@ export const ContentAssetsSection: React.FC<ContentAssetsSectionProps> = ({
               onUploadVideo={handleUploadVideo}
               onUploadThumbnail={handleUploadThumbnail}
               onReplaceAsset={handleReplaceAsset}
-              onRemoveThumbnail={removeSlide}
+              onRemoveThumbnail={id => notifyChange(removeSlide(id))}
               onDownload={downloadAsset}
               uploadError={uploadError}
               onClearUploadError={() => setUploadError(null)}

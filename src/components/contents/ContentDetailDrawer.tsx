@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { ContentMediaPanel } from './ContentMediaPanel';
 import {
   X,
   Sparkles,
@@ -50,6 +51,7 @@ interface ContentDetailDrawerProps {
   clients: Client[];
   isSaving: boolean;
   error?: string | null;
+  onAssetsChanged?: () => void;
 }
 
 type DrawerTab = 'strategy' | 'assets' | 'creation' | 'planning' | 'operation';
@@ -85,7 +87,18 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
   clients,
   isSaving,
   error,
+  onAssetsChanged,
 }) => {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [mediaRevision, setMediaRevision] = useState(0);
+  useEffect(() => {
+    const element = dialogRef.current;
+    if (!isOpen || !element) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    if (!element.open) element.showModal();
+    return () => { element.close(); document.body.style.overflow = previousOverflow; };
+  }, [isOpen, content?.id]);
   const [activeTab, setActiveTab] = useState<DrawerTab>('strategy');
   const [successToast, setSuccessToast] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -373,11 +386,13 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-        {/* Backdrop click triggers close check */}
-        <div className="fixed inset-0" onClick={handleAttemptClose} />
-
-        <div className="relative bg-white w-full max-w-2xl h-full flex flex-col shadow-2xl border-l border-[#E8E9EA] overflow-hidden animate-in slide-in-from-right duration-200 z-10">
+      <dialog ref={dialogRef} aria-label={`Publicação: ${content.internal_title}`}
+        onCancel={event => { event.preventDefault(); if (!isSaving) handleAttemptClose(); }}
+        onClick={event => { if (event.target === event.currentTarget && !isSaving) handleAttemptClose(); }}
+        className="fixed inset-0 m-auto h-[calc(100dvh_-_2rem)] w-[calc(100%_-_2rem)] max-w-[1440px] overflow-hidden rounded-2xl border border-[#E8E9EA] bg-white p-0 text-[#1D1D1D] shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-xs">
+        <div className="grid h-full grid-rows-[35%_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:grid-rows-1">
+          <ContentMediaPanel key={content.id} content={content} revision={mediaRevision} />
+          <div className="relative flex min-h-0 min-w-0 flex-col overflow-hidden bg-white">
           {/* Top Header */}
           <div className="p-6 border-b border-[#E8E9EA] bg-[#FAFAFA] space-y-4 shrink-0">
             <div className="flex items-start justify-between gap-3">
@@ -397,6 +412,7 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
                 onClick={handleAttemptClose}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-[#666668] hover:text-[#1D1D1D] hover:bg-[#F2F3F3] transition-colors cursor-pointer"
                 title="Fechar editor"
+                aria-label="Fechar editor"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -686,6 +702,7 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
             {/* TAB 2: PEÇA & ARQUIVOS */}
             {activeTab === 'assets' && (
               <ContentAssetsSection
+                onAssetsChanged={() => { setMediaRevision(revision => revision + 1); onAssetsChanged?.(); }}
                 clientId={clientId || content.client_id}
                 contentId={content.id}
                 format={format}
@@ -1077,7 +1094,7 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
             </button>
           </div>
         </div>
-      </div>
+        </div>
 
       {/* Discard Changes Confirmation Dialog */}
       {showDiscardConfirm && (
@@ -1116,6 +1133,7 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
           </div>
         </div>
       )}
+      </dialog>
     </>
   );
 };
