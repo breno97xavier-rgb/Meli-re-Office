@@ -25,6 +25,7 @@ import {
 import { PresentationItem } from '../../types/presentations';
 import { ContentFormatBadge } from '../contents/ContentFormatBadge';
 import { ContentStatusBadge } from '../contents/ContentStatusBadge';
+import { ContentMediaPreview } from '../contents/ContentMediaPreview';
 import {
   PresentationItemApprovalBadge,
   ITEM_APPROVAL_STATUS_LABELS,
@@ -141,7 +142,8 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
   }
 
   // Find images/videos for the asset viewer
-  const sortedAssets = [...assets].sort((a, b) => a.display_order - b.display_order);
+  const visualAssets = assets.filter(asset => asset.is_current && (asset.asset_type === 'image' || asset.asset_type === 'video'));
+  const sortedAssets = [...(visualAssets.length ? visualAssets : assets.filter(asset => asset.is_current && asset.asset_type === 'thumbnail'))].sort((a, b) => a.display_order - b.display_order);
   const currentAsset = sortedAssets[activeSlideIndex] || sortedAssets[0] || null;
   const currentSignedUrl = currentAsset?.file_url ? signedUrls[currentAsset.file_url] : null;
 
@@ -235,54 +237,10 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
 
           {/* Asset Display Frame */}
           <div className="bg-[#FAFAFA] border border-[#E8E9EA] rounded-2xl overflow-hidden flex flex-col items-center justify-center min-h-[260px] relative">
-            {assets.length === 0 ? (
-              <div className="p-8 text-center space-y-2">
-                <div className="w-10 h-10 rounded-xl bg-[#F2F3F3] text-[#9E9EA0] flex items-center justify-center mx-auto">
-                  <ImageIcon className="w-5 h-5" />
-                </div>
-                <p className="text-xs font-semibold text-[#666668]">
-                  Nenhum asset visual enviado
-                </p>
-                <p className="text-[11px] text-[#9E9EA0]">
-                  Faça o upload do criativo na área de Conteúdos para visualizá-lo aqui.
-                </p>
-              </div>
-            ) : currentAsset?.asset_type === 'video' || currentAsset?.mime_type?.startsWith('video/') ? (
-              /* Video asset */
-              <div className="w-full flex flex-col items-center justify-center p-3">
-                {currentSignedUrl ? (
-                  <video
-                    src={currentSignedUrl}
-                    controls
-                    className="max-h-[360px] w-auto max-w-full rounded-xl shadow-xs"
-                  />
-                ) : (
-                  <div className="p-6 text-center space-y-2">
-                    <Film className="w-8 h-8 text-[#F15A3C] mx-auto animate-pulse" />
-                    <p className="text-xs font-semibold text-[#1D1D1D]">Vídeo MP4</p>
-                    <span className="text-[10px] text-[#9E9EA0]">{currentAsset.file_name}</span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Image asset */
-              <div className="w-full flex flex-col items-center justify-center p-2 relative group">
-                {currentSignedUrl ? (
-                  <img
-                    src={currentSignedUrl}
-                    alt={currentAsset?.file_name || 'Asset'}
-                    className="max-h-[360px] w-auto max-w-full rounded-xl object-contain shadow-xs bg-white"
-                  />
-                ) : (
-                  <div className="p-6 text-center space-y-1">
-                    <Loader2 className="w-6 h-6 animate-spin text-[#F15A3C] mx-auto" />
-                    <p className="text-[11px] text-[#9E9EA0]">Carregando visualização...</p>
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="h-[360px] w-full">
+              <ContentMediaPreview key={currentAsset?.id || item.id} asset={currentAsset || undefined} url={currentSignedUrl || undefined} title={content.internal_title} controls />
+            </div>
           </div>
-
           {/* Carousel Thumbnail strip if multiple slides */}
           {sortedAssets.length > 1 && (
             <div className="space-y-1.5">
@@ -305,7 +263,7 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
                           : 'border-[#E8E9EA] opacity-70 hover:opacity-100'
                       }`}
                     >
-                      {sUrl ? (
+                      {sUrl && asset.asset_type !== 'video' ? (
                         <img
                           src={sUrl}
                           alt={`Slide ${sIdx + 1}`}
