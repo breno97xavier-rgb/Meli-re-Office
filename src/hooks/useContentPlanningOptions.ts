@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { EditorialPlan, ClientPillar, Campaign } from '../types/planning';
 import {
   fetchContentPlanningOptions,
@@ -32,8 +32,15 @@ export function useContentPlanningOptions(
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestSequence = useRef(0);
+  const [loadedClientId, setLoadedClientId] = useState<string | null | undefined>(undefined);
 
   const loadOptions = useCallback(async () => {
+    const sequence = ++requestSequence.current;
+    setPlans([]);
+    setPillars([]);
+    setCampaigns([]);
+    setLoadedClientId(clientId);
     if (!clientId) {
       setPlans([]);
       setPillars([]);
@@ -47,21 +54,26 @@ export function useContentPlanningOptions(
     setError(null);
     try {
       const data = await fetchContentPlanningOptions(clientId);
+      if (sequence !== requestSequence.current) return;
       setPlans(data.editorialPlans);
       setPillars(data.pillars);
       setCampaigns(data.campaigns);
     } catch (err) {
+      if (sequence !== requestSequence.current) return;
       const msg = formatPlanningError(err);
       setError(msg);
       console.error('[useContentPlanningOptions] Erro ao carregar opções de planejamento:', err);
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) setLoading(false);
     }
   }, [clientId]);
 
   useEffect(() => {
     loadOptions();
+    return () => { requestSequence.current += 1; };
   }, [loadOptions]);
+
+  const matchesClient = loadedClientId === clientId;
 
   // Listas ativas para novos cadastros e seleções operacionais
   const activePlans = useMemo(
@@ -80,14 +92,14 @@ export function useContentPlanningOptions(
   );
 
   return {
-    plans,
-    activePlans,
-    pillars,
-    activePillars,
-    campaigns,
-    activeCampaigns,
-    loading,
-    error,
+    plans: matchesClient ? plans : [],
+    activePlans: matchesClient ? activePlans : [],
+    pillars: matchesClient ? pillars : [],
+    activePillars: matchesClient ? activePillars : [],
+    campaigns: matchesClient ? campaigns : [],
+    activeCampaigns: matchesClient ? activeCampaigns : [],
+    loading: matchesClient ? loading : Boolean(clientId),
+    error: matchesClient ? error : null,
     reload: loadOptions,
   };
 }
