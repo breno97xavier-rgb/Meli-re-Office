@@ -12,6 +12,7 @@ import { ClientsPage } from '@/src/pages/ClientsPage';
 import { ClientProfilePage } from '@/src/pages/ClientProfilePage';
 import { ContentsPage } from '@/src/pages/ContentsPage';
 import { CalendarPage } from '@/src/pages/CalendarPage';
+import { TasksPage } from '@/src/pages/TasksPage';
 import { PlanningPage } from '@/src/pages/PlanningPage';
 import { PresentationsPage } from '@/src/pages/PresentationsPage';
 import { PresentationEditorPage } from '@/src/pages/PresentationEditorPage';
@@ -26,6 +27,8 @@ function AppContent() {
   const { user, profile, isLoading, isUnauthorized, signOut } = useAuth();
   const { currentPath, navigate } = useRouter();
   const [creatingClient, setCreatingClient] = useState(false);
+  const [creatingTask, setCreatingTask] = useState(false);
+  useEffect(() => { setCreatingTask(false); }, [currentPath]);
   useEffect(() => { setCreatingClient(false); }, [currentPath]);
 
   // 0. PUBLIC ROUTES: Public Presentation (/apresentacao/:token)
@@ -90,6 +93,8 @@ function AppContent() {
         return <ContentsPage />;
       case '/calendario':
         return <CalendarPage />;
+      case '/tarefas':
+        return <TasksPage isCreating={creatingTask} onCloseCreate={() => setCreatingTask(false)} />;
       case '/apresentacoes':
         return <PresentationsPage />;
       default:
@@ -111,7 +116,7 @@ function AppContent() {
 
   return (
     <OfficeLayout currentPath={currentPath === '/login' ? '/dashboard' : currentPath} onNavigate={navigate}
-      onCreate={currentPath === '/clientes' ? () => setCreatingClient(true) : undefined}>
+      onCreate={currentPath === '/clientes' ? () => setCreatingClient(true) : currentPath === '/tarefas' ? () => setCreatingTask(true) : undefined}>
       {renderContent()}
     </OfficeLayout>
   );
