@@ -30,7 +30,7 @@ import {
   ITEM_APPROVAL_STATUS_LABELS,
 } from './PresentationStatusBadge';
 
-interface PresentationItemCardProps {
+export interface PresentationItemCardProps {
   item: PresentationItem;
   index: number;
   totalItems: number;
@@ -41,6 +41,8 @@ interface PresentationItemCardProps {
   onRemove: (itemId: string) => void;
   onUpdateNotes: (itemId: string, notes: string) => Promise<void>;
   onUpdateStatus: (itemId: string, status: string) => Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
+  saveNotesOnBlur?: boolean;
 }
 
 function formatDate(dateStr?: string | null): string {
@@ -68,6 +70,8 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
   onRemove,
   onUpdateNotes,
   onUpdateStatus,
+  onDirtyChange,
+  saveNotesOnBlur = true,
 }) => {
   const content = item.content;
   const assets = item.assets || [];
@@ -75,6 +79,7 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
   // Local state for presentation_notes
   const [notes, setNotes] = useState(item.presentation_notes || '');
   const [hasNotesChanged, setHasNotesChanged] = useState(false);
+  useEffect(() => { onDirtyChange?.(hasNotesChanged); }, [hasNotesChanged, onDirtyChange]);
   const [isCopied, setIsCopied] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -439,7 +444,7 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
                 rows={2}
                 value={notes}
                 onChange={handleNotesChange}
-                onBlur={handleSaveNotes}
+                onBlur={saveNotesOnBlur ? handleSaveNotes : undefined}
                 placeholder="Insira orientações específicas para o cliente nesta rodada..."
                 className="w-full px-3 py-2 text-xs bg-white border border-[#E8E9EA] rounded-xl text-[#1D1D1D] placeholder-[#9E9EA0] focus:outline-hidden focus:border-[#F15A3C] transition-all resize-none shadow-2xs"
               />

@@ -3,7 +3,7 @@ import { usePresentationEditor } from '../hooks/usePresentationEditor';
 import { useRouter } from '../hooks/useRouter';
 import type { RoutePath } from '../types';
 import { PresentationEditorHeader } from '../components/presentations/PresentationEditorHeader';
-import { PresentationItemCard } from '../components/presentations/PresentationItemCard';
+import { PresentationItemsFeed } from '../components/presentations/PresentationItemsFeed';
 import { AddContentsToPresentationModal } from '../components/presentations/AddContentsToPresentationModal';
 import { EditPresentationModal } from '../components/presentations/EditPresentationModal';
 import { SharePresentationModal } from '../components/presentations/SharePresentationModal';
@@ -149,24 +149,17 @@ export const PresentationEditorPage: React.FC<PresentationEditorPageProps> = ({
             </button>
           </div>
         ) : (
-          /* List of Presentation Item Cards */
-          <div className="space-y-4">
-            {items.map((item, index) => (
-              <PresentationItemCard
-                key={item.id}
-                item={item}
-                index={index}
-                totalItems={items.length}
-                signedUrls={signedUrls}
-                isSavingNotes={savingItemId === item.id}
-                onMoveUp={(id) => handleMoveItem(id, 'up')}
-                onMoveDown={(id) => handleMoveItem(id, 'down')}
-                onRemove={handleRemoveItem}
-                onUpdateNotes={handleUpdateItemNotes}
-                onUpdateStatus={handleUpdateItemApprovalStatus}
-              />
-            ))}
-          </div>
+          <PresentationItemsFeed
+            items={items}
+            signedUrls={signedUrls}
+            savingItemId={savingItemId}
+            actionLoading={actionLoading}
+            onMoveUp={(id) => handleMoveItem(id, 'up')}
+            onMoveDown={(id) => handleMoveItem(id, 'down')}
+            onRemove={handleRemoveItem}
+            onUpdateNotes={handleUpdateItemNotes}
+            onUpdateStatus={handleUpdateItemApprovalStatus}
+          />
         )}
       </div>
 
