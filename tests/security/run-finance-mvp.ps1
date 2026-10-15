@@ -1,4 +1,4 @@
-param([int]$Port=55439)
+param([int]$Port=55439,[string]$Fixture='finance-mvp-lab.sql')
 $ErrorActionPreference='Stop'
 $labRoot=Join-Path $env:TEMP 'office-helper-lab-20261009'
 $pgCtl=Join-Path $labRoot 'pgsql/bin/pg_ctl.exe'
@@ -21,7 +21,7 @@ try {
  if ($LASTEXITCODE -ne 0 -or ($roles -join '').Trim() -ne '0') { throw 'Roles preexistentes; interrompendo.' }
  & $psql -X --dbname=$adminConnection -v ON_ERROR_STOP=1 -c "CREATE DATABASE $database;"
  if ($LASTEXITCODE -ne 0) { throw 'Banco descartável não criado.' }; $created=$true; $rolesOwned=$true
- & $psql -X --dbname=$connection -v ON_ERROR_STOP=1 -f (Join-Path $PSScriptRoot 'finance-mvp-lab.sql')
+ & $psql -X --dbname=$connection -v ON_ERROR_STOP=1 -f (Join-Path $PSScriptRoot $Fixture)
  if ($LASTEXITCODE -ne 0) { throw 'Teste de Financeiro falhou.' }
 } finally {
  if ($created) { & $psql -X --dbname=$adminConnection -v ON_ERROR_STOP=1 -c "DROP DATABASE $database;" }
