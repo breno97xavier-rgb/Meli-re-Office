@@ -13,6 +13,7 @@ import { ClientProfilePage } from '@/src/pages/ClientProfilePage';
 import { ContentsPage } from '@/src/pages/ContentsPage';
 import { CalendarPage } from '@/src/pages/CalendarPage';
 import { TasksPage } from '@/src/pages/TasksPage';
+import { FinancePage } from '@/src/pages/FinancePage';
 import { PlanningPage } from '@/src/pages/PlanningPage';
 import { PresentationsPage } from '@/src/pages/PresentationsPage';
 import { PresentationEditorPage } from '@/src/pages/PresentationEditorPage';
@@ -28,6 +29,8 @@ function AppContent() {
   const { currentPath, navigate } = useRouter();
   const [creatingClient, setCreatingClient] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
+  const [creatingFinance, setCreatingFinance] = useState(false);
+  useEffect(() => { setCreatingFinance(false); }, [currentPath]);
   useEffect(() => { setCreatingTask(false); }, [currentPath]);
   useEffect(() => { setCreatingClient(false); }, [currentPath]);
 
@@ -95,6 +98,8 @@ function AppContent() {
         return <CalendarPage />;
       case '/tarefas':
         return <TasksPage isCreating={creatingTask} onCloseCreate={() => setCreatingTask(false)} />;
+      case '/financeiro':
+        return <FinancePage isCreating={creatingFinance} onCloseCreate={() => setCreatingFinance(false)} />;
       case '/apresentacoes':
         return <PresentationsPage />;
       default:
@@ -116,7 +121,7 @@ function AppContent() {
 
   return (
     <OfficeLayout currentPath={currentPath === '/login' ? '/dashboard' : currentPath} onNavigate={navigate}
-      onCreate={currentPath === '/clientes' ? () => setCreatingClient(true) : currentPath === '/tarefas' ? () => setCreatingTask(true) : undefined}>
+      onCreate={currentPath === '/clientes' ? () => setCreatingClient(true) : currentPath === '/tarefas' ? () => setCreatingTask(true) : currentPath === '/financeiro' ? () => setCreatingFinance(true) : undefined}>
       {renderContent()}
     </OfficeLayout>
   );
