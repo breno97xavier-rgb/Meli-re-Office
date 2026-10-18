@@ -25,18 +25,22 @@ export async function fetchFinanceData(clientId?: string): Promise<{ entries: Fi
     entries.push(...(data || []) as FinanceEntry[]);
     if (!data || data.length < 500) break;
   }
-  const result = await supabase.from('clients').select('id,name,commercial_name,monthly_amount,contract_start_date,contract_end_date').eq('workspace_id',workspaceId).order('name');
+  let clientsQuery = supabase.from('clients').select('id,name,commercial_name,monthly_amount,contract_start_date,contract_end_date').eq('workspace_id',workspaceId).order('name');
+  if (clientId) clientsQuery = clientsQuery.eq('id',clientId);
+  const result = await clientsQuery;
   if (result.error) throw new Error('Não foi possível carregar os clientes.');
   return { entries, clients: (result.data || []) as FinanceClient[] };
 }
 
-export async function fetchFinancePlan(): Promise<{baseline: FinanceBaseline | null; rules: FinanceRecurrence[]}> {
+export async function fetchFinancePlan(clientId?: string): Promise<{baseline: FinanceBaseline | null; rules: FinanceRecurrence[]}> {
   const {workspaceId}=await context();
-  const baseline=await supabase.from('finance_cash_settings').select('*').eq('workspace_id',workspaceId).maybeSingle();
+  const baseline=clientId?{data:null,error:null}:await supabase.from('finance_cash_settings').select('*').eq('workspace_id',workspaceId).maybeSingle();
   if(baseline.error)throw new Error('Não foi possível carregar o saldo inicial.');
   const rules:FinanceRecurrence[]=[];
   for(let offset=0;;offset+=500){
-    const result=await supabase.from('finance_recurrences').select('*').eq('workspace_id',workspaceId).order('id').range(offset,offset+499);
+    let query=supabase.from('finance_recurrences').select('*').eq('workspace_id',workspaceId).order('id').range(offset,offset+499);
+    if(clientId)query=query.eq('client_id',clientId);
+    const result=await query;
     if(result.error)throw new Error('Não foi possível carregar as recorrências.');
     rules.push(...(result.data||[]) as FinanceRecurrence[]);
     if(!result.data||result.data.length<500)break;

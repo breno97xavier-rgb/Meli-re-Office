@@ -120,3 +120,24 @@ test('replacement client fee excludes months already issued under another rule',
  const {contracts:c}=await load();const existing={...input,client_id:'client-a',status:'cancelled',recurrence_id:'old-rule',competence_month:'2026-10-01'};const current={...rule,client_id:'client-a'};
  assert.equal(c.projectFinance([existing],[current],'2026-10-15','2026-11-30').income,200000);
 });
+test('client finance reads filter every ledger page and the client selector at the server',async()=>{
+ const {service:s,calls}=await load({rows:Array.from({length:1001},(_,id)=>({id}))});
+ await s.fetchFinanceData('client-a');
+ const pages=calls.filter(c=>c.table==='finance_entries');assert.equal(pages.length,3);
+ for(const page of pages){assert.ok(page.filters.some(([key,value])=>key==='workspace_id'&&value==='workspace-a'));assert.ok(page.filters.some(([key,value])=>key==='client_id'&&value==='client-a'));}
+ const client=calls.find(c=>c.table==='clients');assert.ok(client.filters.some(([key,value])=>key==='id'&&value==='client-a'));assert.ok(client.filters.some(([key,value])=>key==='workspace_id'&&value==='workspace-a'));
+});
+test('client recurrence read never requests agency cash settings',async()=>{
+ const {service:s,calls}=await load();const plan=await s.fetchFinancePlan('client-a');
+ assert.equal(plan.baseline,null);assert.equal(calls.some(c=>c.table==='finance_cash_settings'),false);
+ const rules=calls.find(c=>c.table==='finance_recurrences');assert.equal(JSON.stringify(rules.filters),JSON.stringify([['workspace_id','workspace-a'],['client_id','client-a']]));
+});
+test('agency finance keeps global plan lookup without a client constraint',async()=>{
+ const {service:s,calls}=await load();await s.fetchFinancePlan();
+ assert.equal(calls.some(c=>c.table==='finance_cash_settings'),true);
+ assert.equal(calls.find(c=>c.table==='finance_recurrences').filters.some(([key])=>key==='client_id'),false);
+});
+test('client recurrence read failure is explicit and cannot fall back to global data',async()=>{
+ const {service:s,calls}=await load({queryError:{code:'42501'}});await assert.rejects(s.fetchFinancePlan('client-a'));
+ assert.equal(calls.filter(c=>c.table==='finance_recurrences').length,1);assert.equal(calls.some(c=>c.table==='finance_cash_settings'),false);
+});

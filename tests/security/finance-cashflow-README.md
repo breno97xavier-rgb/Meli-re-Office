@@ -22,6 +22,24 @@ Decisão autorizada na conversa: MVP interno com saldo inicial datado, caixa acu
 - Advisor consultado: nenhum apontamento nas novas tabelas/funções; alertas preexistentes de outros domínios permanecem pendentes de auditoria específica. Isso não homologa toda a segurança do Office.
 - Dependências locais não instaladas; build e inspeção visual da publicação devem ser registrados após a entrega.
 
+### Evidências após publicação
+
+- Commit `c7a8697` enviado por fast-forward para main e chore/s3-reconciliation. GitHub/Vercel informou `success / Deployment has completed`.
+- Chrome autenticado no domínio principal confirmou cartões novos, ausência de saldo presumido, regra interna sem cliente e preenchimento da mensalidade/vigência do cliente. Receita exige término; saldo inválido foi rejeitado antes da escrita.
+- Não foram salvos formulários financeiros pelo navegador. Fluxo completo de geração/baixa foi validado em SQL com rollback e em testes locais, não homologado como fluxo completo de navegador. Houve falha do controle automatizado ao tratar a confirmação de descarte; não é evidência de falha de persistência do produto.
+- Conferência remota após inspeção: zero lançamentos, zero regras e zero saldos iniciais. Captura local do painel: `C:/Users/breno/AppData/Local/Temp/office-finance-cashflow.png`.
+- As alterações locais preexistentes permaneceram fora do commit. Este complemento de evidência foi registrado localmente após a publicação.
+
 ## Limites e continuidade
 
 Caixa é um controle informado pelo usuário, sem conciliação bancária automática e sem movimentar dinheiro. Projeção não equivale a lucro contábil. Categorias são texto livre; favorecidos estruturados/equipe permanecem evolução futura. Homologação final de uso e visual depende do usuário.
+
+## Integração ao perfil do cliente — 18/10/2026
+
+Após aprovação visual do Financeiro, a continuidade do MVP identificou que a aba Financeiro do perfil ainda era placeholder. Ela agora reutiliza FinancePage e os mesmos serviços/entidades. Não cria faturas ou registros paralelos e não exige migração.
+
+Leituras de lançamentos, recorrências e cadastro mínimo usam client_id/id além do workspace no servidor. O perfil não consulta finance_cash_settings nem exibe caixa acumulado/saldo projetado global. Indicadores mensais e previsão mostram apenas os registros vinculados ao cliente; despesas internas permanecem no Financeiro geral.
+
+Novos lançamentos e recorrências recebem o cliente contextual com seletor bloqueado. Os handlers recusam payload de outro cliente antes da gravação. Edição/baixa/histórico mantêm as operações existentes; segurança remota e grants não foram alterados. O filtro contextual não substitui a RLS.
+
+Validação local: 110 testes passaram, com quatro cenários novos para filtro em todas as páginas do ledger, seletor contextual, plano sem consulta ao caixa da agência, comportamento global preservado e falha sem fallback. Nenhum pacote instalado. Build completo/inspeção visual a conferir na publicação. Google Agenda e estratégia verificada de recuperação continuam pendências próprias do MVP; este marco não homologa o sistema inteiro.
