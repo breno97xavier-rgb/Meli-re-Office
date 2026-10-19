@@ -15,6 +15,7 @@ interface CalendarDayCellProps {
   movingContentIds?: string[];
   isDraggable?: boolean;
   taskCards?: React.ReactNode;
+  activityCount?: number;
 }
 
 const MAX_VISIBLE_CARDS = 3;
@@ -29,6 +30,7 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   movingContentIds = [],
   isDraggable = true,
   taskCards,
+  activityCount = contents.length,
 }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: day.date,
@@ -36,7 +38,7 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   });
 
   const visibleCards = contents.slice(0, MAX_VISIBLE_CARDS);
-  const overflowCount = Math.max(0, contents.length - MAX_VISIBLE_CARDS);
+  const overflowCount = Math.max(0, activityCount - MAX_VISIBLE_CARDS);
   const isWeekend = day.dayOfWeek === 5 || day.dayOfWeek === 6; // Sábado ou Domingo
 
   // Determinação da classe de fundo e borda da célula
@@ -58,12 +60,15 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   return (
     <div
       ref={setNodeRef}
+      onClick={(event) => {
+        if (!(event.target as HTMLElement).closest('button,a,[role="button"]')) onOpenOverflow(day.date, contents);
+      }}
       id={`calendar-day-cell-${day.date}`}
-      className={`min-h-[125px] sm:min-h-[140px] p-2 flex flex-col justify-between border-b border-r border-[#E8E9EA] transition-all duration-100 group ${cellBgClasses}`}
+      className={`h-[196px] min-w-0 p-2 flex flex-col justify-between border-b border-r border-[#E8E9EA] transition-all duration-100 group ${cellBgClasses}`}
     >
       {/* 1. Cell Header: Day number, Create (+) Button & Today/Count Badges */}
       <div className="flex items-center justify-between gap-1 mb-1.5">
-        <div className="flex items-center gap-1.5">
+        <button type="button" onClick={() => onOpenOverflow(day.date, contents)} aria-label={`Abrir agenda de ${formattedDayMonth}`} className="flex items-center gap-1.5 rounded focus-visible:outline-2 focus-visible:outline-blue-600">
           {day.isToday ? (
             <span
               className="w-6 h-6 rounded-full bg-[#1D1D1D] text-white text-xs font-bold flex items-center justify-center shadow-xs"
@@ -82,7 +87,7 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
               {day.day}
             </span>
           )}
-        </div>
+        </button>
 
         <div className="flex items-center gap-1">
           {/* Botão discreto de criação contextual (+) visível no hover/focus */}
@@ -103,7 +108,7 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
           )}
 
           {/* Count pill if there are contents on this day */}
-          {contents.length > 0 && (
+          {activityCount > 0 && (
             <span
               className={`text-[10px] font-semibold px-1.5 py-0.2 rounded-full border ${
                 day.isCurrentMonth
@@ -111,18 +116,19 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
                   : 'bg-zinc-100 text-zinc-400 border-zinc-200'
               }`}
             >
-              {contents.length}
+              {activityCount}
             </span>
           )}
         </div>
       </div>
 
       {/* 2. Cards Area */}
-      <div className="flex-1 space-y-1.5 min-h-0">
+      <div className="flex-1 space-y-1 min-h-0 overflow-hidden">
         {visibleCards.map((content) => (
           <CalendarContentCard
             key={content.id}
             content={content}
+            compact
             onClick={onSelectContent}
             showClientName={showClientName}
             isDraggable={isDraggable}
@@ -133,14 +139,14 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
       </div>
 
       {/* 3. Overflow indicator button */}
-      {overflowCount > 0 && (
+      {(
         <button
           type="button"
           onClick={() => onOpenOverflow(day.date, contents)}
           className="mt-1.5 w-full py-1 px-2 text-[10px] font-bold text-[#444446] hover:text-[#1D1D1D] bg-[#F2F3F3] hover:bg-[#EAEBEB] border border-[#E8E9EA] rounded-md text-center transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#1D1D1D]"
-          aria-label={`Ver mais ${overflowCount} conteúdos para o dia ${day.day}`}
+          aria-label={`Ver todas as ${activityCount} atividades de ${formattedDayMonth}`}
         >
-          +{overflowCount} {overflowCount === 1 ? 'conteúdo' : 'conteúdos'}
+          {overflowCount > 0 ? `+${overflowCount} · Ver dia` : activityCount > 0 ? 'Ver dia' : 'Abrir dia'}
         </button>
       )}
     </div>

@@ -54,17 +54,14 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
   const weekdaysShort = getWeekdayNames('short');
 
   // Estado para o modal de overflow do dia
-  const [overflowData, setOverflowData] = React.useState<{
-    dateKey: string;
-    contents: Content[];
-  } | null>(null);
+  const [overflowDate, setOverflowDate] = React.useState<string | null>(null);
 
-  const handleOpenOverflow = (dateKey: string, contents: Content[]) => {
-    setOverflowData({ dateKey, contents });
+  const handleOpenOverflow = (dateKey: string) => {
+    setOverflowDate(dateKey);
   };
 
   const handleCloseOverflow = () => {
-    setOverflowData(null);
+    setOverflowDate(null);
   };
 
   // 1. Loading Skeleton State
@@ -172,7 +169,8 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
                   showClientName={showClientName}
                   movingContentIds={movingContentIds}
                   isDraggable={true}
-                  taskCards={<>{onSelectTask && (tasksByDate[day.date] || []).map(task => <CalendarTaskCard key={task.id} task={task} clientName={taskClientNames[task.client_id || '']} onSelect={onSelectTask} />)}{(googleByDate[day.date] || []).map(event => <GoogleEventCard key={event.id} event={event} zone={googleZone} />)}</>}
+                  activityCount={dayContents.length + (tasksByDate[day.date]?.length || 0) + (googleByDate[day.date]?.length || 0)}
+                  taskCards={<>{onSelectTask && (tasksByDate[day.date] || []).slice(0, Math.max(0, 3-dayContents.length)).map(task => <CalendarTaskCard compact key={task.id} task={task} clientName={taskClientNames[task.client_id || '']} onSelect={onSelectTask} />)}{(googleByDate[day.date] || []).slice(0, Math.max(0, 3-dayContents.length-(onSelectTask ? tasksByDate[day.date]?.length || 0 : 0))).map(event => <GoogleEventCard compact key={event.id} event={event} zone={googleZone} />)}</>}
                 />
               );
             })}
@@ -287,9 +285,14 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
 
       {/* Modal de Overflow */}
       <CalendarDayOverflowModal
-        isOpen={Boolean(overflowData)}
-        dateKey={overflowData?.dateKey || null}
-        contents={overflowData?.contents || []}
+        isOpen={Boolean(overflowDate)}
+        dateKey={overflowDate}
+        contents={contentsByDate[overflowDate || ''] || []}
+        tasks={tasksByDate[overflowDate || ''] || []}
+        googleEvents={googleByDate[overflowDate || ''] || []}
+        googleZone={googleZone}
+        taskClientNames={taskClientNames}
+        onSelectTask={onSelectTask}
         onClose={handleCloseOverflow}
         onSelectContent={onSelectContent}
         showClientName={showClientName}

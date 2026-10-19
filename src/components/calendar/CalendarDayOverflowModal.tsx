@@ -1,7 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X, Calendar as CalendarIcon } from 'lucide-react';
 import { Content } from '../../types/contents';
 import { CalendarContentCardVisual } from './CalendarContentCardVisual';
+import { CalendarTaskCard } from './CalendarTaskCard';
+import { GoogleEventCard } from './GoogleCalendarPanel';
+import type { Task } from '../../types/tasks';
+import type { GoogleCalendarEvent } from '../../types/googleCalendar';
 import { parseCivilDate, getMonthName, getWeekdayNames, getDayOfWeek } from '../../utils/civilDate';
 
 interface CalendarDayOverflowModalProps {
@@ -11,6 +15,11 @@ interface CalendarDayOverflowModalProps {
   onClose: () => void;
   onSelectContent: (content: Content) => void;
   showClientName?: boolean;
+  tasks?: Task[];
+  googleEvents?: GoogleCalendarEvent[];
+  googleZone?: string;
+  taskClientNames?: Record<string, string>;
+  onSelectTask?: (task: Task) => void;
 }
 
 export const CalendarDayOverflowModal: React.FC<CalendarDayOverflowModalProps> = ({
@@ -20,7 +29,26 @@ export const CalendarDayOverflowModal: React.FC<CalendarDayOverflowModalProps> =
   onClose,
   onSelectContent,
   showClientName = true,
+  tasks = [], googleEvents = [], googleZone = 'America/Sao_Paulo', taskClientNames = {}, onSelectTask,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const oldOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const dialog = dialogRef.current;
+    dialog?.querySelector<HTMLButtonElement>('button')?.focus();
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialog) return;
+      const items = Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],[tabindex="0"]'));
+      const first = items[0], last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', trap);
+    return () => { document.removeEventListener('keydown', trap); document.body.style.overflow = oldOverflow; if (previous?.isConnected) previous.focus(); };
+  }, [isOpen]);
   // ESC key handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -57,6 +85,7 @@ export const CalendarDayOverflowModal: React.FC<CalendarDayOverflowModalProps> =
       aria-labelledby="calendar-overflow-title"
     >
       <div
+        ref={dialogRef}
         id="calendar-overflow-modal-content"
         className="bg-white border border-[#E8E9EA] rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
@@ -75,8 +104,7 @@ export const CalendarDayOverflowModal: React.FC<CalendarDayOverflowModalProps> =
                 {day} de {monthName} de {year}
               </h3>
               <p className="text-xs text-[#666668] font-medium">
-                {weekdayName} • {contents.length}{' '}
-                {contents.length === 1 ? 'conteúdo planejado' : 'conteúdos planejados'}
+                {weekdayName} • {contents.length + tasks.length + googleEvents.length} atividades
               </p>
             </div>
           </div>
@@ -92,6 +120,7 @@ export const CalendarDayOverflowModal: React.FC<CalendarDayOverflowModalProps> =
 
         {/* Contents List */}
         <div className="p-6 max-h-[60vh] overflow-y-auto space-y-3">
+          {contents.length > 0 && <h4 className="text-xs font-semibold text-zinc-600">Conteúdos</h4>}
           {contents.map((content) => (
             <CalendarContentCardVisual
               key={content.id}
@@ -103,6 +132,11 @@ export const CalendarDayOverflowModal: React.FC<CalendarDayOverflowModalProps> =
               showClientName={showClientName}
             />
           ))}
+          {tasks.length > 0 && <h4 className="text-xs font-semibold text-violet-700">Tarefas</h4>}
+          {tasks.map(task => <CalendarTaskCard key={task.id} task={task} clientName={taskClientNames[task.client_id || '']} onSelect={() => { onClose(); onSelectTask?.(task); }} />)}
+          {googleEvents.length > 0 && <h4 className="text-xs font-semibold text-blue-700">Google Agenda</h4>}
+          {googleEvents.map(event => <GoogleEventCard key={event.id} event={event} zone={googleZone} />)}
+          {!contents.length && !tasks.length && !googleEvents.length && <p className="text-sm text-zinc-500">Nenhuma atividade neste dia com os filtros atuais.</p>}
         </div>
 
         {/* Modal Footer */}
