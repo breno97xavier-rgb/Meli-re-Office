@@ -12,6 +12,9 @@ import {
 } from '@dnd-kit/core';
 import { AlertCircle, RefreshCw, X } from 'lucide-react';
 import { useCalendarContents } from '../hooks/useCalendarContents';
+import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
+import { projectGoogleEvents } from '../services/googleCalendarContracts';
+import { GoogleCalendarPanel } from '../components/calendar/GoogleCalendarPanel';
 import { useCalendarTasks } from '../hooks/useCalendarTasks';
 import { projectCalendarTasks } from '../services/calendarTaskContracts';
 import { TaskEditor } from '../components/tasks/TaskEditor';
@@ -74,6 +77,10 @@ export const CalendarPage: React.FC = () => {
     handleSelectContent,
   } = useCalendarContents();
   const calendarTasks = useCalendarTasks();
+  const google = useGoogleCalendar(gridDays[0].date,gridDays[gridDays.length-1].date);
+  const googleZone=Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const googleByDate=projectGoogleEvents(google.events,gridDays.map(day=>day.date),googleZone,searchTerm);
+  const googleInMonth=new Set(gridDays.filter(day=>day.isCurrentMonth).flatMap(day=>(googleByDate[day.date]||[]).map(event=>event.id))).size;
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [includeDoneTasks, setIncludeDoneTasks] = useState(false);
   const taskClientNames = Object.fromEntries(calendarTasks.clients.map(client => [client.id, client.commercial_name || client.name]));
@@ -184,12 +191,14 @@ export const CalendarPage: React.FC = () => {
           onPreviousMonth={previousMonth}
           onNextMonth={nextMonth}
           onGoToToday={goToToday}
-          onRefresh={() => { loadContents(); calendarTasks.reload(); }}
+          onRefresh={() => { loadContents(); calendarTasks.reload(); google.reload(); }}
           onOpenBacklog={() => setIsBacklogOpen(true)}
           loading={loading}
           totalPlannedInMonth={metrics.totalPlannedInMonth}
           totalUndated={metrics.totalUndated}
         />
+
+        <GoogleCalendarPanel status={google.status} loading={google.loading} busy={google.busy} error={google.error} onConnect={google.connect} onDisconnect={google.disconnect} onRefresh={google.reload} />
 
         {/* 2. Loading Error Banner */}
         {error && (
@@ -280,6 +289,9 @@ export const CalendarPage: React.FC = () => {
           movingContentIds={movingContentIds}
           tasksByDate={taskProjection.byDate}
           tasksInMonth={taskProjection.monthCount}
+          googleByDate={googleByDate}
+          googleInMonth={googleInMonth}
+          googleZone={googleZone}
           taskClientNames={taskClientNames}
           onSelectTask={setSelectedTask}
         />

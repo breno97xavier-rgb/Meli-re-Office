@@ -1,6 +1,8 @@
 import React from 'react';
 import { CalendarGridDay, parseCivilDate, getMonthName, getWeekdayNames } from '../../utils/civilDate';
 import { Content } from '../../types/contents';
+import { GoogleEventCard } from './GoogleCalendarPanel';
+import type { GoogleCalendarEvent } from '../../types/googleCalendar';
 import type { Task } from '../../types/tasks';
 import { CalendarTaskCard } from './CalendarTaskCard';
 import { CalendarDayCell } from './CalendarDayCell';
@@ -22,6 +24,9 @@ interface MonthGridProps {
   movingContentIds?: string[];
   tasksByDate?: Record<string, Task[]>;
   tasksInMonth?: number;
+  googleByDate?: Record<string, GoogleCalendarEvent[]>;
+  googleInMonth?: number;
+  googleZone?: string;
   taskClientNames?: Record<string, string>;
   onSelectTask?: (task: Task) => void;
 }
@@ -40,6 +45,9 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
   movingContentIds = [],
   tasksByDate = {},
   tasksInMonth = 0,
+  googleByDate = {},
+  googleInMonth = 0,
+  googleZone = 'America/Sao_Paulo',
   taskClientNames = {},
   onSelectTask,
 }) => {
@@ -95,13 +103,13 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
 
   // Identificação de dias com conteúdos para visualização mobile (Agenda)
   const mobileDaysWithContents = gridDays.filter(
-    (day) => day.isCurrentMonth && ((contentsByDate[day.date]?.length || 0) + (tasksByDate[day.date]?.length || 0)) > 0
+    (day) => day.isCurrentMonth && ((contentsByDate[day.date]?.length || 0) + (tasksByDate[day.date]?.length || 0) + (googleByDate[day.date]?.length || 0)) > 0
   );
 
   return (
     <div className="space-y-4">
       {/* Aviso contextual se mês estiver vazio ou filtros sem resultado */}
-      {monthContents.length === 0 && tasksInMonth === 0 && (
+      {monthContents.length === 0 && tasksInMonth === 0 && googleInMonth === 0 && (
         <div className="p-4 bg-[#F7F7F8] border border-[#E8E9EA] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#666668]">
           <div className="flex items-center gap-2.5">
             {isFilterActive ? (
@@ -164,7 +172,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
                   showClientName={showClientName}
                   movingContentIds={movingContentIds}
                   isDraggable={true}
-                  taskCards={onSelectTask && (tasksByDate[day.date] || []).map(task => <CalendarTaskCard key={task.id} task={task} clientName={taskClientNames[task.client_id || '']} onSelect={onSelectTask} />)}
+                  taskCards={<>{onSelectTask && (tasksByDate[day.date] || []).map(task => <CalendarTaskCard key={task.id} task={task} clientName={taskClientNames[task.client_id || '']} onSelect={onSelectTask} />)}{(googleByDate[day.date] || []).map(event => <GoogleEventCard key={event.id} event={event} zone={googleZone} />)}</>}
                 />
               );
             })}
@@ -215,6 +223,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
                     <span className="text-[11px] font-medium text-[#666668]">
                       {dayContents.length} {dayContents.length === 1 ? 'conteúdo' : 'conteúdos'}
                       {Boolean(tasksByDate[day.date]?.length) && ` · ${tasksByDate[day.date].length} tarefa(s)`}
+                      {Boolean(googleByDate[day.date]?.length) && ` · ${googleByDate[day.date].length} compromisso(s)`}
                     </span>
                     {onCreateContent && (
                       <button
@@ -242,6 +251,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
                     />
                   ))}
                   {onSelectTask && (tasksByDate[day.date] || []).map(task => <CalendarTaskCard key={task.id} task={task} clientName={taskClientNames[task.client_id || '']} onSelect={onSelectTask} />)}
+                  {(googleByDate[day.date] || []).map(event => <GoogleEventCard key={event.id} event={event} zone={googleZone} />)}
                 </div>
               </div>
             );
