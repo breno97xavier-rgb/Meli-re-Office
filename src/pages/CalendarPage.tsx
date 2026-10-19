@@ -14,6 +14,8 @@ import { AlertCircle, RefreshCw, X } from 'lucide-react';
 import { useCalendarContents } from '../hooks/useCalendarContents';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
 import { projectGoogleEvents } from '../services/googleCalendarContracts';
+import { GoogleEventEditor } from '../components/calendar/GoogleEventEditor';
+import type { GoogleCalendarEvent } from '../types/googleCalendar';
 import { GoogleCalendarPanel } from '../components/calendar/GoogleCalendarPanel';
 import { useCalendarTasks } from '../hooks/useCalendarTasks';
 import { projectCalendarTasks } from '../services/calendarTaskContracts';
@@ -78,6 +80,7 @@ export const CalendarPage: React.FC = () => {
   } = useCalendarContents();
   const calendarTasks = useCalendarTasks();
   const google = useGoogleCalendar(gridDays[0].date,gridDays[gridDays.length-1].date);
+  const [googleEditor,setGoogleEditor]=useState<{event:GoogleCalendarEvent|null;date:string}|null>(null);
   const googleZone=Intl.DateTimeFormat().resolvedOptions().timeZone;
   const googleByDate=projectGoogleEvents(google.events,gridDays.map(day=>day.date),googleZone,searchTerm);
   const googleInMonth=new Set(gridDays.filter(day=>day.isCurrentMonth).flatMap(day=>(googleByDate[day.date]||[]).map(event=>event.id))).size;
@@ -198,7 +201,7 @@ export const CalendarPage: React.FC = () => {
           totalUndated={metrics.totalUndated}
         />
 
-        <GoogleCalendarPanel status={google.status} loading={google.loading} busy={google.busy} error={google.error} onConnect={google.connect} onDisconnect={google.disconnect} onRefresh={google.reload} />
+        <GoogleCalendarPanel canWrite={google.canWrite} onCreate={() => setGoogleEditor({event:null,date:gridDays.find(day=>day.isToday)?.date || gridDays.find(day=>day.isCurrentMonth)!.date})} status={google.status} loading={google.loading} busy={google.busy} error={google.error} onConnect={google.connect} onDisconnect={google.disconnect} onRefresh={google.reload} />
 
         {/* 2. Loading Error Banner */}
         {error && (
@@ -292,9 +295,12 @@ export const CalendarPage: React.FC = () => {
           googleByDate={googleByDate}
           googleInMonth={googleInMonth}
           googleZone={googleZone}
+          onSelectGoogle={event=>setGoogleEditor({event,date:event.start.slice(0,10)})}
+          onCreateGoogle={google.canWrite ? date=>setGoogleEditor({event:null,date}) : undefined}
           taskClientNames={taskClientNames}
           onSelectTask={setSelectedTask}
         />
+        {googleEditor && <GoogleEventEditor key={googleEditor.event?.id || googleEditor.date} event={googleEditor.event} date={googleEditor.date} canWrite={google.canWrite} onClose={()=>setGoogleEditor(null)} onSaved={()=>{setGoogleEditor(null);void google.reload();}} />}
         {selectedTask && <TaskEditor key={selectedTask.id} task={selectedTask} clients={calendarTasks.clients} onClose={() => setSelectedTask(null)} onSave={async input => { await calendarTasks.save(selectedTask.id, input); setSelectedTask(null); }} />}
 
         {/* 6. Drag Overlay for smooth preview during drag (portal to document.body) */}

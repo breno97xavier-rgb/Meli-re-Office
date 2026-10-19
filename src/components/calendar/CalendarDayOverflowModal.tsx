@@ -18,6 +18,8 @@ interface CalendarDayOverflowModalProps {
   tasks?: Task[];
   googleEvents?: GoogleCalendarEvent[];
   googleZone?: string;
+  onSelectGoogle?: (event: GoogleCalendarEvent) => void;
+  onCreateGoogle?: (date: string) => void;
   taskClientNames?: Record<string, string>;
   onSelectTask?: (task: Task) => void;
 }
@@ -29,6 +31,7 @@ export const CalendarDayOverflowModal: React.FC<CalendarDayOverflowModalProps> =
   onClose,
   onSelectContent,
   showClientName = true,
+  onSelectGoogle, onCreateGoogle,
   tasks = [], googleEvents = [], googleZone = 'America/Sao_Paulo', taskClientNames = {}, onSelectTask,
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -135,10 +138,11 @@ export const CalendarDayOverflowModal: React.FC<CalendarDayOverflowModalProps> =
           {tasks.length > 0 && <h4 className="text-xs font-semibold text-violet-700">Tarefas</h4>}
           {tasks.map(task => <CalendarTaskCard key={task.id} task={task} clientName={taskClientNames[task.client_id || '']} onSelect={() => { onClose(); onSelectTask?.(task); }} />)}
           {googleEvents.length > 0 && <h4 className="text-xs font-semibold text-blue-700">Google Agenda</h4>}
-          {googleEvents.map(event => <GoogleEventCard key={event.id} event={event} zone={googleZone} />)}
+          {googleEvents.map(event => <GoogleEventCard key={event.id} event={event} zone={googleZone} onSelect={onSelectGoogle ? selected => { onClose(); onSelectGoogle(selected); } : undefined} />)}
           {!contents.length && !tasks.length && !googleEvents.length && <p className="text-sm text-zinc-500">Nenhuma atividade neste dia com os filtros atuais.</p>}
         </div>
 
+        {onCreateGoogle && <button type="button" onClick={() => { onClose(); onCreateGoogle(dateKey); }} className="mx-6 mb-4 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white">Novo compromisso neste dia</button>}
         {/* Modal Footer */}
         <div className="px-6 py-3 border-t border-[#E8E9EA] bg-[#FAFAFA] flex justify-end">
           <button

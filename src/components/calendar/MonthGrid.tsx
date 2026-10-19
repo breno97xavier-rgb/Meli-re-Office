@@ -27,6 +27,8 @@ interface MonthGridProps {
   googleByDate?: Record<string, GoogleCalendarEvent[]>;
   googleInMonth?: number;
   googleZone?: string;
+  onSelectGoogle?: (event: GoogleCalendarEvent) => void;
+  onCreateGoogle?: (date: string) => void;
   taskClientNames?: Record<string, string>;
   onSelectTask?: (task: Task) => void;
 }
@@ -48,6 +50,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
   googleByDate = {},
   googleInMonth = 0,
   googleZone = 'America/Sao_Paulo',
+  onSelectGoogle, onCreateGoogle,
   taskClientNames = {},
   onSelectTask,
 }) => {
@@ -170,7 +173,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
                   movingContentIds={movingContentIds}
                   isDraggable={true}
                   activityCount={dayContents.length + (tasksByDate[day.date]?.length || 0) + (googleByDate[day.date]?.length || 0)}
-                  taskCards={<>{onSelectTask && (tasksByDate[day.date] || []).slice(0, Math.max(0, 3-dayContents.length)).map(task => <CalendarTaskCard compact key={task.id} task={task} clientName={taskClientNames[task.client_id || '']} onSelect={onSelectTask} />)}{(googleByDate[day.date] || []).slice(0, Math.max(0, 3-dayContents.length-(onSelectTask ? tasksByDate[day.date]?.length || 0 : 0))).map(event => <GoogleEventCard compact key={event.id} event={event} zone={googleZone} />)}</>}
+                  taskCards={<>{onSelectTask && (tasksByDate[day.date] || []).slice(0, Math.max(0, 3-dayContents.length)).map(task => <CalendarTaskCard compact key={task.id} task={task} clientName={taskClientNames[task.client_id || '']} onSelect={onSelectTask} />)}{(googleByDate[day.date] || []).slice(0, Math.max(0, 3-dayContents.length-(onSelectTask ? tasksByDate[day.date]?.length || 0 : 0))).map(event => <GoogleEventCard compact key={event.id} event={event} zone={googleZone} onSelect={onSelectGoogle} />)}</>}
                 />
               );
             })}
@@ -249,7 +252,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
                     />
                   ))}
                   {onSelectTask && (tasksByDate[day.date] || []).map(task => <CalendarTaskCard key={task.id} task={task} clientName={taskClientNames[task.client_id || '']} onSelect={onSelectTask} />)}
-                  {(googleByDate[day.date] || []).map(event => <GoogleEventCard key={event.id} event={event} zone={googleZone} />)}
+                  {(googleByDate[day.date] || []).map(event => <GoogleEventCard key={event.id} event={event} zone={googleZone} onSelect={onSelectGoogle} />)}
                 </div>
               </div>
             );
@@ -291,6 +294,8 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
         tasks={tasksByDate[overflowDate || ''] || []}
         googleEvents={googleByDate[overflowDate || ''] || []}
         googleZone={googleZone}
+        onSelectGoogle={onSelectGoogle}
+        onCreateGoogle={onCreateGoogle}
         taskClientNames={taskClientNames}
         onSelectTask={onSelectTask}
         onClose={handleCloseOverflow}
