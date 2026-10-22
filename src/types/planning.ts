@@ -17,6 +17,10 @@ export interface ClientStrategy {
   created_by?: string | null;
   created_at: string;
   updated_at: string;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  review_on?: string | null;
+  revision?: number;
 }
 
 export interface ClientPillar {
@@ -88,6 +92,9 @@ export interface CreateClientStrategyInput {
 }
 
 export interface UpdateClientStrategyInput {
+  valid_from?: string | null;
+  valid_until?: string | null;
+  review_on?: string | null;
   positioning?: string | null;
   value_proposition?: string | null;
   target_audience?: string | null;

@@ -1,4 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import type { Client } from '../types/clients';
+import { BriefingSection } from '../components/planning/BriefingSection';
+import { EditorialSeriesSection } from '../components/planning/EditorialSeriesSection';
+import { StrategyHistory } from '../components/planning/StrategyHistory';
 import { useClients } from '../hooks/useClients';
 import { useClientStrategy } from '../hooks/useClientStrategy';
 import { useClientPillars } from '../hooks/useClientPillars';
@@ -27,6 +31,23 @@ export const PlanningPage: React.FC = () => {
     }
   }, [clients, selectedClientId]);
 
+  return <ClientPlanningWorkspace key={selectedClientId || 'no-client'} clients={clients} selectedClientId={selectedClientId} loadingClients={loadingClients} onSelectClient={setSelectedClientId}/>;
+};
+
+const ClientPlanningWorkspace: React.FC<{clients:Client[];selectedClientId:string;loadingClients:boolean;onSelectClient:(id:string)=>void}> = ({clients,selectedClientId,loadingClients,onSelectClient}) => {
+  const [tab,setTab]=useState('strategy');
+  const [dirty,setDirty]=useState(false);
+  const onDirty=useCallback((value:boolean)=>setDirty(value),[]);
+  const canLeave=()=>!dirty||window.confirm('Descartar alterações não salvas deste planejamento?');
+  useEffect(()=>{
+    const guard=(event:Event)=>{
+      if(dirty&&!window.confirm('Descartar alterações não salvas deste planejamento?'))event.preventDefault();
+    };
+    window.addEventListener('meliere:before-navigate',guard);
+    return()=>window.removeEventListener('meliere:before-navigate',guard);
+  },[dirty]);
+  useEffect(()=>{const guard=(event:BeforeUnloadEvent)=>{if(dirty){event.preventDefault();event.returnValue='';}};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);},[dirty]);
+
   // Strategy hook
   const {
     strategy,
@@ -51,15 +72,13 @@ export const PlanningPage: React.FC = () => {
     reorderPillars,
   } = useClientPillars(selectedClientId, { includeInactive: true });
 
-  const selectedClient = clients.find((c) => c.id === selectedClientId);
-
   return (
     <div id="planning-page" className="p-6 md:p-8 space-y-6">
       {/* 1. Header & Client Selector */}
       <PlanningHeader
         clients={clients}
         selectedClientId={selectedClientId}
-        onSelectClient={setSelectedClientId}
+        onSelectClient={id=>{if(canLeave())onSelectClient(id);}}
         loadingClients={loadingClients}
       />
 
@@ -86,6 +105,13 @@ export const PlanningPage: React.FC = () => {
       ) : (
         /* Client Planning Workspace: Strategy & Pillars */
         <div className="space-y-6">
+          <p className="text-sm text-[#666668]">Briefing, estratégia e séries são opcionais. Clientes de sites, branding ou serviços avulsos podem continuar sem planejamento editorial.</p>
+          <div role="tablist" aria-label="Áreas do planejamento" className="flex flex-wrap gap-2 border-b border-[#E8E9EA] pb-3">
+            {[['strategy','Estratégia'],['briefing','Briefing'],['pillars','Pilares e séries'],['cycles','Ciclos editoriais'],['campaigns','Campanhas']].map(([id,label])=><button key={id} id={`planning-tab-${id}`} type="button" role="tab" aria-selected={tab===id} aria-controls={`planning-panel-${id}`} tabIndex={tab===id?0:-1} onKeyDown={event=>{if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();const ids=['strategy','briefing','pillars','cycles','campaigns'];const next=ids[(ids.indexOf(tab)+(event.key==='ArrowRight'?1:4))%5];if(canLeave()){setDirty(false);setTab(next);requestAnimationFrame(()=>document.getElementById(`planning-tab-${next}`)?.focus());}}}} onClick={()=>{if(id!==tab&&canLeave()){setDirty(false);setTab(id);}}} className={`rounded-lg px-4 py-2 text-sm ${tab===id?'bg-[#1D1D1D] text-white':'bg-white text-[#666668] hover:bg-[#EDEEEE]'}`}>{label}</button>)}
+          </div>
+          <div role="tabpanel" id={`planning-panel-${tab}`} aria-labelledby={`planning-tab-${tab}`} className="space-y-5">
+          {tab==='briefing'&&<BriefingSection clientId={selectedClientId} onDirty={onDirty}/>}
+          {tab==='strategy'&&<>
           {/* Section 1: Brand Strategy */}
           <BrandStrategySection
             strategy={strategy}
@@ -95,10 +121,13 @@ export const PlanningPage: React.FC = () => {
             saveError={saveError}
             onSave={saveStrategy}
             onRefresh={loadStrategy}
+            onDirty={onDirty}
           />
+          <StrategyHistory clientId={selectedClientId} revision={strategy?.revision}/>
+          </>}
 
           {/* Section 2: Editorial Pillars */}
-          <EditorialPillarsSection
+          {tab==='pillars'&&<><EditorialPillarsSection
             pillars={pillars}
             loading={loadingPillars}
             error={pillarsError}
@@ -109,17 +138,19 @@ export const PlanningPage: React.FC = () => {
             onToggleActive={togglePillarActive}
             onReorderPillars={reorderPillars}
           />
+          <EditorialSeriesSection clientId={selectedClientId} pillars={pillars} onDirty={onDirty}/></>}
 
           {/* Section 3: Editorial Planning Cycles */}
-          <EditorialCyclesSection
+          {tab==='cycles'&&<EditorialCyclesSection
             clientId={selectedClientId}
             clientPillars={pillars}
-          />
+          />}
 
           {/* Section 4: Campaigns */}
-          <CampaignsSection
+          {tab==='campaigns'&&<CampaignsSection
             clientId={selectedClientId}
-          />
+          />}
+          </div>
         </div>
       )}
     </div>

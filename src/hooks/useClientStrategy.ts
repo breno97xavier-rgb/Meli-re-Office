@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { saveStrategyRevision } from '../services/planningFoundationService';
 import { ClientStrategy, UpdateClientStrategyInput } from '../types/planning';
 import {
   getClientStrategy,
-  upsertClientStrategy,
   formatPlanningError,
 } from '../services/planningService';
 
@@ -22,8 +22,11 @@ export function useClientStrategy(clientId?: string): UseClientStrategyReturn {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const epoch = useRef(0);
+  const locked = useRef(false);
 
   const loadStrategy = useCallback(async () => {
+    const request = ++epoch.current;
     if (!clientId) {
       setStrategy(null);
       setLoading(false);
@@ -36,17 +39,18 @@ export function useClientStrategy(clientId?: string): UseClientStrategyReturn {
 
     try {
       const data = await getClientStrategy(clientId);
-      setStrategy(data);
+      if (request === epoch.current) setStrategy(data);
     } catch (err) {
       console.error('Erro ao carregar estratégia do cliente:', err);
-      setError(formatPlanningError(err));
+      if (request === epoch.current) setError(formatPlanningError(err));
     } finally {
-      setLoading(false);
+      if (request === epoch.current) setLoading(false);
     }
   }, [clientId]);
 
   useEffect(() => {
     loadStrategy();
+    return () => { epoch.current++; };
   }, [loadStrategy]);
 
   const saveStrategy = useCallback(
@@ -56,11 +60,13 @@ export function useClientStrategy(clientId?: string): UseClientStrategyReturn {
         return null;
       }
 
+      if (locked.current) return null;
+      locked.current = true;
       setSaving(true);
       setSaveError(null);
 
       try {
-        const updated = await upsertClientStrategy(clientId, input);
+        const updated = await saveStrategyRevision(clientId, strategy?.revision || 0, input);
         setStrategy(updated);
         return updated;
       } catch (err) {
@@ -69,10 +75,11 @@ export function useClientStrategy(clientId?: string): UseClientStrategyReturn {
         setSaveError(errorMsg);
         return null;
       } finally {
+        locked.current = false;
         setSaving(false);
       }
     },
-    [clientId]
+    [clientId, strategy?.revision]
   );
 
   return {

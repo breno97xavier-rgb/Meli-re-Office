@@ -23,6 +23,7 @@ interface BrandStrategySectionProps {
   saveError: string | null;
   onSave: (input: UpdateClientStrategyInput) => Promise<ClientStrategy | null>;
   onRefresh: () => Promise<void>;
+  onDirty?: (dirty:boolean) => void;
 }
 
 interface ChannelOption {
@@ -48,6 +49,8 @@ export const BrandStrategySection: React.FC<BrandStrategySectionProps> = ({
   saving,
   saveError,
   onSave,
+  onDirty,
+  onRefresh,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -61,6 +64,8 @@ export const BrandStrategySection: React.FC<BrandStrategySectionProps> = ({
   const [doDonts, setDoDonts] = useState('');
   const [businessGoals, setBusinessGoals] = useState('');
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
+  const [validFrom,setValidFrom]=useState(''),[validUntil,setValidUntil]=useState(''),[reviewOn,setReviewOn]=useState('');
+  useEffect(()=>{onDirty?.(isEditing);return()=>onDirty?.(false);},[isEditing,onDirty]);
 
   // Sync form with strategy when entering edit mode or when strategy changes
   const populateForm = () => {
@@ -72,6 +77,7 @@ export const BrandStrategySection: React.FC<BrandStrategySectionProps> = ({
     setDoDonts(strategy?.do_donts || '');
     setBusinessGoals(strategy?.business_goals || '');
     setSelectedChannels(strategy?.priority_channels || []);
+    setValidFrom(strategy?.valid_from||'');setValidUntil(strategy?.valid_until||'');setReviewOn(strategy?.review_on||'');
   };
 
   useEffect(() => {
@@ -111,6 +117,7 @@ export const BrandStrategySection: React.FC<BrandStrategySectionProps> = ({
       do_donts: doDonts,
       business_goals: businessGoals,
       priority_channels: selectedChannels,
+      valid_from:validFrom||null,valid_until:validUntil||null,review_on:reviewOn||null,
     };
 
     const result = await onSave(input);
@@ -123,7 +130,7 @@ export const BrandStrategySection: React.FC<BrandStrategySectionProps> = ({
 
   const hasStrategyContent = Boolean(
     strategy &&
-      (strategy.positioning ||
+      (strategy.valid_from || strategy.valid_until || strategy.review_on || strategy.positioning ||
         strategy.value_proposition ||
         strategy.target_audience ||
         strategy.brand_voice_tone ||
@@ -180,6 +187,7 @@ export const BrandStrategySection: React.FC<BrandStrategySectionProps> = ({
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2.5 text-xs text-red-800">
           <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
           <span>{saveError || error}</span>
+          <button type="button" disabled={saving||loading} className="underline" onClick={()=>{if(!isEditing||window.confirm('Atualizar os dados e descartar as alterações não salvas?')){setIsEditing(false);onRefresh();}}}>Atualizar dados</button>
         </div>
       )}
 
@@ -195,6 +203,12 @@ export const BrandStrategySection: React.FC<BrandStrategySectionProps> = ({
       ) : isEditing ? (
         /* EDIT MODE FORM */
         <form onSubmit={handleSubmit} className="space-y-6">
+          <fieldset disabled={saving} className="space-y-6">
+          <div className="grid gap-4 rounded-xl border border-[#E8E9EA] p-4 sm:grid-cols-3">
+            <label className="text-xs">Início da vigência<input type="date" value={validFrom} onChange={e=>setValidFrom(e.target.value)} className="mt-1 w-full rounded-lg border p-2"/></label>
+            <label className="text-xs">Fim da vigência<input type="date" min={validFrom||undefined} value={validUntil} onChange={e=>setValidUntil(e.target.value)} className="mt-1 w-full rounded-lg border p-2"/></label>
+            <label className="text-xs">Próxima revisão<input type="date" value={reviewOn} onChange={e=>setReviewOn(e.target.value)} className="mt-1 w-full rounded-lg border p-2"/></label>
+          </div>
           {/* Bloco 1 — Fundamentos */}
           <div className="space-y-3.5 p-4 bg-[#FBFBFC] border border-[#E8E9EA] rounded-xl">
             <div className="flex items-center gap-2 text-xs font-semibold text-[#1D1D1D]">
@@ -361,6 +375,7 @@ export const BrandStrategySection: React.FC<BrandStrategySectionProps> = ({
               <span>{saving ? 'Salvando...' : 'Salvar Estratégia'}</span>
             </button>
           </div>
+          </fieldset>
         </form>
       ) : !hasStrategyContent ? (
         /* EMPTY STATE IN READING MODE */
@@ -388,6 +403,7 @@ export const BrandStrategySection: React.FC<BrandStrategySectionProps> = ({
       ) : (
         /* READ MODE DISPLAY */
         <div className="space-y-6">
+          <p className="text-xs text-[#666668]">Revisão {strategy?.revision||'legada'} · Vigência: {strategy?.valid_from||'não definida'} até {strategy?.valid_until||'sem término'} · Revisão prevista: {strategy?.review_on||'não definida'}</p>
           {/* Bloco 1 — Fundamentos */}
           <div className="space-y-3 p-4 bg-[#FBFBFC] border border-[#E8E9EA] rounded-xl">
             <div className="flex items-center gap-2 text-xs font-semibold text-[#1D1D1D] border-b border-[#F0F0F1] pb-2">

@@ -27,6 +27,9 @@ export function useRouter() {
 
   const navigate = useCallback((path: RoutePath) => {
     const targetPath = path === '/' ? '/dashboard' : path;
+    if (window.location.pathname !== targetPath && !window.dispatchEvent(new Event('meliere:before-navigate', { cancelable: true }))) {
+      return;
+    }
     if (window.location.pathname !== targetPath) {
       window.history.pushState({}, '', targetPath);
     }
