@@ -1,7 +1,7 @@
-param([int]$Port=55441,[string]$Fixture='planning-authorization-lab.sql')
+param([int]$Port=55441,[string]$Fixture='planning-authorization-lab.sql',[string]$Runtime='C:\Users\breno\AppData\Local\Temp\office-helper-lab-20261009\pgsql\bin')
 $ErrorActionPreference='Stop'
 # Runtime já existente; não instala, não usa Supabase nem lê configurações de conexão.
-$runtime='C:\Users\breno\AppData\Local\Temp\office-helper-lab-20261009\pgsql\bin'
+$runtime=$Runtime
 $init=Join-Path $runtime 'initdb.exe'
 $ctl=Join-Path $runtime 'pg_ctl.exe'
 $psql=Join-Path $runtime 'psql.exe'
@@ -21,8 +21,11 @@ try {
  if ($startProcess.ExitCode -ne 0) { throw 'Falha ao iniciar PostgreSQL local.' }; $started=$true
  & $psql -X --dbname="host=127.0.0.1 port=$Port user=office_lab dbname=postgres connect_timeout=5" -v ON_ERROR_STOP=1 -f (Join-Path $PSScriptRoot $Fixture)
  if ($LASTEXITCODE -ne 0) { throw 'Laboratório de autorização de Planejamento falhou.' }
- if ($Fixture -eq 'planning-foundation-lab.sql') {
+ if ($Fixture -in @('planning-foundation-lab.sql','editorial-templates-lab.sql')) {
   & (Join-Path $PSScriptRoot 'planning-foundation-concurrency.ps1') -Psql $psql -Connection "host=127.0.0.1 port=$Port user=office_lab dbname=postgres connect_timeout=5" -ArtifactPrefix ($data+'.concurrency')
+ }
+ if ($Fixture -eq 'editorial-templates-lab.sql') {
+  & (Join-Path $PSScriptRoot 'planning-foundation-concurrency.ps1') -Psql $psql -Connection "host=127.0.0.1 port=$Port user=office_lab dbname=postgres connect_timeout=5" -ArtifactPrefix ($data+'.template-concurrency') -Domain templates
  }
 } finally {
  if ($started) { & $ctl -D $data -m fast -w stop }

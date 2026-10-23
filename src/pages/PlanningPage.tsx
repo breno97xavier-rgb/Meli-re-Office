@@ -3,6 +3,7 @@ import type { Client } from '../types/clients';
 import { BriefingSection } from '../components/planning/BriefingSection';
 import { EditorialSeriesSection } from '../components/planning/EditorialSeriesSection';
 import { StrategyHistory } from '../components/planning/StrategyHistory';
+import { EditorialTemplatesSection } from '../components/planning/EditorialTemplatesSection';
 import { useClients } from '../hooks/useClients';
 import { useClientStrategy } from '../hooks/useClientStrategy';
 import { useClientPillars } from '../hooks/useClientPillars';
@@ -107,10 +108,11 @@ const ClientPlanningWorkspace: React.FC<{clients:Client[];selectedClientId:strin
         <div className="space-y-6">
           <p className="text-sm text-[#666668]">Briefing, estratégia e séries são opcionais. Clientes de sites, branding ou serviços avulsos podem continuar sem planejamento editorial.</p>
           <div role="tablist" aria-label="Áreas do planejamento" className="flex flex-wrap gap-2 border-b border-[#E8E9EA] pb-3">
-            {[['strategy','Estratégia'],['briefing','Briefing'],['pillars','Pilares e séries'],['cycles','Ciclos editoriais'],['campaigns','Campanhas']].map(([id,label])=><button key={id} id={`planning-tab-${id}`} type="button" role="tab" aria-selected={tab===id} aria-controls={`planning-panel-${id}`} tabIndex={tab===id?0:-1} onKeyDown={event=>{if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();const ids=['strategy','briefing','pillars','cycles','campaigns'];const next=ids[(ids.indexOf(tab)+(event.key==='ArrowRight'?1:4))%5];if(canLeave()){setDirty(false);setTab(next);requestAnimationFrame(()=>document.getElementById(`planning-tab-${next}`)?.focus());}}}} onClick={()=>{if(id!==tab&&canLeave()){setDirty(false);setTab(id);}}} className={`rounded-lg px-4 py-2 text-sm ${tab===id?'bg-[#1D1D1D] text-white':'bg-white text-[#666668] hover:bg-[#EDEEEE]'}`}>{label}</button>)}
+            {[['strategy','Estratégia'],['briefing','Briefing'],['pillars','Pilares e séries'],['templates','Grade editorial'],['cycles','Ciclos editoriais'],['campaigns','Campanhas']].map(([id,label])=><button key={id} id={`planning-tab-${id}`} type="button" role="tab" aria-selected={tab===id} aria-controls={`planning-panel-${id}`} tabIndex={tab===id?0:-1} onKeyDown={event=>{if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();const ids=['strategy','briefing','pillars','templates','cycles','campaigns'];const next=ids[(ids.indexOf(tab)+(event.key==='ArrowRight'?1:ids.length-1))%ids.length];if(canLeave()){setDirty(false);setTab(next);requestAnimationFrame(()=>document.getElementById(`planning-tab-${next}`)?.focus());}}}} onClick={()=>{if(id!==tab&&canLeave()){setDirty(false);setTab(id);}}} className={`rounded-lg px-4 py-2 text-sm ${tab===id?'bg-[#1D1D1D] text-white':'bg-white text-[#666668] hover:bg-[#EDEEEE]'}`}>{label}</button>)}
           </div>
           <div role="tabpanel" id={`planning-panel-${tab}`} aria-labelledby={`planning-tab-${tab}`} className="space-y-5">
           {tab==='briefing'&&<BriefingSection clientId={selectedClientId} onDirty={onDirty}/>}
+          {tab==='templates'&&<EditorialTemplatesSection clientId={selectedClientId} pillars={pillars} onDirty={onDirty}/>}
           {tab==='strategy'&&<>
           {/* Section 1: Brand Strategy */}
           <BrandStrategySection
