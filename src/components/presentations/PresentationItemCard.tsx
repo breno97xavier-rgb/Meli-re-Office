@@ -26,6 +26,7 @@ import { PresentationItem } from '../../types/presentations';
 import { ContentFormatBadge } from '../contents/ContentFormatBadge';
 import { ContentStatusBadge } from '../contents/ContentStatusBadge';
 import { ContentMediaPreview } from '../contents/ContentMediaPreview';
+import { ReviewVersionNotice } from './ReviewVersionNotice';
 import {
   PresentationItemApprovalBadge,
   ITEM_APPROVAL_STATUS_LABELS,
@@ -41,7 +42,7 @@ export interface PresentationItemCardProps {
   onMoveDown: (itemId: string) => void;
   onRemove: (itemId: string) => void;
   onUpdateNotes: (itemId: string, notes: string) => Promise<void>;
-  onUpdateStatus: (itemId: string, status: string) => Promise<void>;
+  onUpdateStatus: (itemId: string, status: string, feedback?: string) => Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
   saveNotesOnBlur?: boolean;
 }
@@ -119,8 +120,14 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
 
   const handleStatusSelectChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value;
+    let feedback: string | undefined;
+    if (newStatus === 'changes_requested' || newStatus === 'rejected') {
+      const supplied = window.prompt('Descreva os ajustes necessários ou o motivo da recusa desta versão:');
+      if (!supplied?.trim()) return;
+      feedback = supplied.trim();
+    }
     try {
-      await onUpdateStatus(item.id, newStatus);
+      await onUpdateStatus(item.id, newStatus, feedback);
     } catch {
       // Error handled by parent hook
     }
@@ -149,6 +156,7 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
 
   return (
     <div className="bg-white border border-[#E8E9EA] rounded-2xl shadow-2xs overflow-hidden transition-all duration-150">
+      <ReviewVersionNotice item={item} />
       {/* Top action bar: Order, Position, Controls */}
       <div className="flex items-center justify-between px-5 py-3 bg-[#FAFAFA] border-b border-[#E8E9EA]">
         {/* Left: Sequence badge and title */}
@@ -167,7 +175,7 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
           <button
             type="button"
             onClick={() => onMoveUp(item.id)}
-            disabled={index === 0}
+            disabled={Boolean(item.review_id) || index === 0}
             title="Subir posição"
             className="p-1.5 text-[#666668] hover:text-[#1D1D1D] hover:bg-[#E8E9EA] rounded-lg transition-colors disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
           >
@@ -178,7 +186,7 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
           <button
             type="button"
             onClick={() => onMoveDown(item.id)}
-            disabled={index === totalItems - 1}
+            disabled={Boolean(item.review_id) || index === totalItems - 1}
             title="Descer posição"
             className="p-1.5 text-[#666668] hover:text-[#1D1D1D] hover:bg-[#E8E9EA] rounded-lg transition-colors disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
           >
@@ -210,6 +218,7 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
             <button
               type="button"
               onClick={() => setConfirmRemove(true)}
+              disabled={Boolean(item.review_id) || item.client_approval_status !== 'pending'}
               title="Remover da apresentação (não exclui o conteúdo original)"
               className="p-1.5 text-[#9E9EA0] hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
             >
@@ -399,6 +408,7 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
 
             <div className="relative">
               <textarea
+                disabled={Boolean(item.review_id)}
                 rows={2}
                 value={notes}
                 onChange={handleNotesChange}
@@ -435,6 +445,7 @@ export const PresentationItemCard: React.FC<PresentationItemCardProps> = ({
                 
                 {/* Admin Status Quick Select */}
                 <select
+                  disabled={!item.review_id || item.client_approval_status !== 'pending'}
                   value={item.client_approval_status || 'pending'}
                   onChange={handleStatusSelectChange}
                   className="text-[11px] px-2 py-1 bg-[#FAFAFA] border border-[#E8E9EA] rounded-lg text-[#1D1D1D] cursor-pointer"

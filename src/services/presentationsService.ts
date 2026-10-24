@@ -9,6 +9,7 @@ import {
 import { Content } from '../types/contents';
 import { ContentAsset } from '../types/contentAssets';
 import { fetchContentAssets } from './contentAssetsService';
+import { resolveReviewMaterial } from './presentationReviewContracts';
 import { normalizeItemApprovalStatus, normalizePresentationStatus } from './presentationDecisionContracts';
 
 export function formatPresentationError(error: unknown): string {
@@ -19,6 +20,15 @@ export function formatPresentationError(error: unknown): string {
       ? error
       : errObj.message || errObj.details || '';
   const lowerMsg = msg.toLowerCase();
+  if (lowerMsg.includes('legacy_review_create_next') || lowerMsg.includes('round_frozen_create_next')) {
+    return 'Os materiais desta rodada estão preservados. Use Nova Rodada para enviar uma nova versão.';
+  }
+  if (lowerMsg.includes('prepare_review_before_sharing') || lowerMsg.includes('review_version_required')) {
+    return 'Prepare a versão para avaliação antes de compartilhar ou registrar o parecer.';
+  }
+  if (lowerMsg.includes('asset_path_requires_review')) {
+    return 'Há um arquivo antigo com caminho não verificado. Revise o armazenamento antes de preparar a versão.';
+  }
 
   console.error('[presentationsService] Error detail:', {
     code: errObj.code,
@@ -392,6 +402,7 @@ export async function fetchPresentationItems(presentationId: string): Promise<Pr
         client_approval_status,
         client_feedback,
         reviewed_at,
+        review_id, review_content, review_assets, review_material_revision, review_prepared_at,
         created_at,
         content:contents(
           id,
@@ -441,7 +452,7 @@ export async function fetchPresentationItems(presentationId: string): Promise<Pr
       const resolvedContent = normalizeResolvedContent(row.content);
 
       let assets: ContentAsset[] = [];
-      if (row.content_id) {
+      if (row.content_id && !row.review_id && row.client_approval_status === 'pending') {
         try {
           const allAssets = await fetchContentAssets(row.content_id as string);
           assets = allAssets.filter((a) => a.is_current);
@@ -450,7 +461,12 @@ export async function fetchPresentationItems(presentationId: string): Promise<Pr
         }
       }
 
-      items.push({
+      items.push(resolveReviewMaterial({
+        review_id: row.review_id as string | null,
+        review_content: row.review_content as Content | null,
+        review_assets: row.review_assets as ContentAsset[] | null,
+        review_material_revision: row.review_material_revision as number | null,
+        review_prepared_at: row.review_prepared_at as string | null,
         id: row.id as string,
         presentation_id: row.presentation_id as string,
         content_id: row.content_id as string,
@@ -462,7 +478,7 @@ export async function fetchPresentationItems(presentationId: string): Promise<Pr
         created_at: row.created_at as string,
         content: resolvedContent,
         assets,
-      });
+      }));
     }
 
     return items;
@@ -720,12 +736,12 @@ export async function updatePresentationItem(
 
   // Se estiver atualizando status de aprovação, invocar obrigatoriamente a RPC administrativa para sincronização universal
   if (input.client_approval_status !== undefined) {
-    const { data: rpcData, error: rpcError } = await supabase.rpc('update_presentation_item_admin_decision', {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('submit_presentation_review_decision', {
       p_item_id: itemId,
+      p_review_id: input.review_id,
       p_status: input.client_approval_status,
       p_feedback: input.client_feedback !== undefined ? input.client_feedback : null,
-      p_presentation_notes: input.presentation_notes !== undefined ? input.presentation_notes : null,
-      p_update_notes: input.presentation_notes !== undefined,
+      p_token: null,
     });
 
     if (rpcError) {
@@ -764,31 +780,10 @@ export async function updatePresentationItem(
     }
   }
 
-  const resolvedContent = normalizeResolvedContent(data.content);
-
-  let assets: ContentAsset[] = [];
-  if (data.content_id) {
-    try {
-      const allAssets = await fetchContentAssets(data.content_id);
-      assets = allAssets.filter((a) => a.is_current);
-    } catch (assetErr) {
-      console.warn('Could not fetch assets for updated item:', assetErr);
-    }
-  }
-
-  return {
-    id: data.id,
-    presentation_id: data.presentation_id,
-    content_id: data.content_id,
-    display_order: data.display_order,
-    presentation_notes: data.presentation_notes,
-    client_approval_status: normalizeItemApprovalStatus(data.client_approval_status),
-    client_feedback: data.client_feedback,
-    reviewed_at: data.reviewed_at,
-    created_at: data.created_at,
-    content: resolvedContent,
-    assets,
-  };
+  const refreshed = await fetchPresentationItems(data.presentation_id);
+  const updated = refreshed.find(item => item.id === itemId);
+  if (!updated) throw new Error('Item não encontrado após atualização.');
+  return updated;
 }
 
 /**
@@ -852,3 +847,8 @@ export async function createNextPresentationRound(
   }
 }
 
+
+export async function preparePresentationReview(presentationId: string): Promise<void> {
+  const { error } = await supabase.rpc('prepare_presentation_review', { p_presentation_id: presentationId });
+  if (error) throw new Error(formatPresentationError(error));
+}

@@ -1,3 +1,4 @@
+import { useOfficeConfirm } from '../shared/OfficeConfirmProvider';
 import React, { useState, useEffect } from 'react';
 import {
   Compass,
@@ -52,6 +53,7 @@ export const BrandStrategySection: React.FC<BrandStrategySectionProps> = ({
   onDirty,
   onRefresh,
 }) => {
+  const confirm = useOfficeConfirm();
   const [isEditing, setIsEditing] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -187,7 +189,7 @@ export const BrandStrategySection: React.FC<BrandStrategySectionProps> = ({
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2.5 text-xs text-red-800">
           <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
           <span>{saveError || error}</span>
-          <button type="button" disabled={saving||loading} className="underline" onClick={()=>{if(!isEditing||window.confirm('Atualizar os dados e descartar as alterações não salvas?')){setIsEditing(false);onRefresh();}}}>Atualizar dados</button>
+          <button type="button" disabled={saving||loading} className="underline" onClick={async()=>{if(!isEditing||await confirm('Atualizar os dados e descartar as alterações não salvas?')){setIsEditing(false);onRefresh();}}}>Atualizar dados</button>
         </div>
       )}
 

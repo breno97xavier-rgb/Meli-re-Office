@@ -27,15 +27,16 @@ export function useRouter() {
 
   const navigate = useCallback((path: RoutePath) => {
     const targetPath = path === '/' ? '/dashboard' : path;
-    if (window.location.pathname !== targetPath && !window.dispatchEvent(new Event('meliere:before-navigate', { cancelable: true }))) {
+    const proceed = () => {
+      if (window.location.pathname !== targetPath) window.history.pushState({}, '', targetPath);
+      setCurrentPath(targetPath);
+      window.dispatchEvent(new Event(NAVIGATE_EVENT));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    if (window.location.pathname !== targetPath && !window.dispatchEvent(new CustomEvent('meliere:before-navigate', { cancelable: true, detail: { proceed } }))) {
       return;
     }
-    if (window.location.pathname !== targetPath) {
-      window.history.pushState({}, '', targetPath);
-    }
-    setCurrentPath(targetPath);
-    window.dispatchEvent(new Event(NAVIGATE_EVENT));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    proceed();
   }, []);
 
   return {

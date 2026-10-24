@@ -74,7 +74,14 @@ export function normalizePublicPresentationData(raw: unknown): PublicPresentatio
     const assets: ContentAsset[] = [];
     for (const rawAsset of Array.isArray(rawAssets) ? rawAssets : []) {
       if (!rawAsset || typeof rawAsset !== 'object') continue;
-      assets.push(rawAsset as ContentAsset);
+      const asset = rawAsset as Record<string, unknown>;
+      // The public RPC names the private bucket path storage_path; renderers use file_url.
+      assets.push({
+        ...asset,
+        file_url: typeof asset.file_url === 'string' && asset.file_url
+          ? asset.file_url
+          : typeof asset.storage_path === 'string' ? asset.storage_path : '',
+      } as unknown as ContentAsset);
     }
 
     // Sort assets by display_order ASC
@@ -89,6 +96,8 @@ export function normalizePublicPresentationData(raw: unknown): PublicPresentatio
       client_approval_status: normalizeItemApprovalStatus(itemObj.client_approval_status),
       client_feedback: (itemObj.client_feedback as string) || null,
       reviewed_at: (itemObj.reviewed_at as string) || null,
+      review_id: (itemObj.review_id as string) || null,
+      review_prepared_at: (itemObj.review_prepared_at as string) || null,
       created_at: (itemObj.created_at as string) || (root.created_at as string),
       content: (content as Content) || null,
       assets,

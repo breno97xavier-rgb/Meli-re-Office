@@ -379,7 +379,7 @@ export const EditorialPlanFormModal: React.FC<EditorialPlanFormModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSaving || !title.trim() || !startDate || !endDate}
+              disabled={isSaving || !title.trim() || Boolean(startDate) !== Boolean(endDate)}
               className="inline-flex items-center gap-2 px-5 py-2 text-xs font-medium text-white bg-[#1D1D1D] hover:bg-[#2E2E2E] rounded-lg transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
             >
               {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

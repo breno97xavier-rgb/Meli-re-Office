@@ -281,50 +281,17 @@ export async function replaceContentAsset(
   }
 
   // 2. Perform DB operations: mark old asset is_current = false, insert new asset
+  let replacementRejected = false;
   try {
-    // Mark previous current asset as non-current
-    const { error: updateErr } = await supabase
-      .from('content_assets')
-      .update({ is_current: false })
-      .eq('id', targetAssetId)
-      .eq('content_id', contentId)
-      .eq('is_current', true)
-      .select('id')
-      .single();
-
-    if (updateErr) {
-      throw updateErr;
-    }
-
-    // Insert new version
-    const newVersion = (targetAsset.version || 1) + 1;
-    const { data: newAsset, error: insertErr } = await supabase
-      .from('content_assets')
-      .insert([
-        {
-          content_id: contentId,
-          asset_type: assetType,
-          file_url: storagePath,
-          file_name: file.name,
-          file_size_bytes: file.size,
-          mime_type: file.type,
-          version: newVersion,
-          display_order: targetAsset.display_order,
-          is_current: true,
-        },
-      ])
-      .select('*')
-      .single();
-
+    const { data: newAsset, error: insertErr } = await supabase.rpc('mutate_content_asset_version', {
+      p_content_id: contentId, p_target_id: targetAssetId,
+      p_file: { file_url: storagePath, file_name: file.name, file_size_bytes: file.size, mime_type: file.type },
+    });
     if (insertErr) {
-      // Try to revert the previous update if insert failed
-      await supabase
-        .from('content_assets')
-        .update({ is_current: true })
-        .eq('id', targetAssetId)
-        .eq('content_id', contentId);
+      replacementRejected = /^[0-9A-Z]{5}$/.test(insertErr.code || '');
       throw insertErr;
     }
+    if (!newAsset) throw new Error('Resultado indeterminado da substituição. Atualize antes de repetir.');
 
     return newAsset as ContentAsset;
   } catch (dbErr: unknown) {
@@ -332,7 +299,7 @@ export async function replaceContentAsset(
 
     // Compensating transaction: remove the newly uploaded file
     try {
-      await supabase.storage
+      if (replacementRejected) await supabase.storage
         .from(CONTENT_ASSETS_BUCKET)
         .remove([storagePath]);
     } catch (cleanupErr) {
@@ -357,20 +324,8 @@ export async function reorderContentAssets(
 ): Promise<void> {
   if (!contentId || !orderedAssetIds || orderedAssetIds.length === 0) return;
 
-  const updates = orderedAssetIds.map((id, index) =>
-    supabase
-      .from('content_assets')
-      .update({ display_order: index })
-      .eq('id', id)
-      .eq('content_id', contentId)
-  );
-
-  const results = await Promise.all(updates);
-  const failed = results.find((r) => r.error);
-  if (failed && failed.error) {
-    console.error('Error reordering assets:', failed.error);
-    throw new Error(failed.error.message || 'Erro ao reordenar slides do carrossel.');
-  }
+  const { error } = await supabase.rpc('mutate_content_asset_version', { p_content_id: contentId, p_order: orderedAssetIds });
+  if (error) throw new Error(error.message || 'Erro ao reordenar slides do carrossel.');
 }
 
 /**
@@ -383,46 +338,8 @@ export async function removeCurrentAsset(
 ): Promise<void> {
   if (!assetId || !contentId) return;
 
-  // 1. Fetch the asset to know its type
-  const { data: targetAsset, error: fetchErr } = await supabase
-    .from('content_assets')
-    .select('*')
-    .eq('id', assetId)
-    .single();
-
-  if (fetchErr || !targetAsset) {
-    throw new Error('Asset não encontrado para remoção.');
-  }
-
-  // 2. Mark as is_current = false
-  const { error: updateErr } = await supabase
-    .from('content_assets')
-    .update({ is_current: false })
-    .eq('id', assetId);
-
-  if (updateErr) {
-    console.error('Error removing active asset:', updateErr);
-    throw new Error(updateErr.message || 'Erro ao desativar asset.');
-  }
-
-  // 3. Re-index remaining current assets of same asset_type
-  const { data: remainingAssets, error: listErr } = await supabase
-    .from('content_assets')
-    .select('*')
-    .eq('content_id', contentId)
-    .eq('asset_type', targetAsset.asset_type)
-    .eq('is_current', true)
-    .order('display_order', { ascending: true });
-
-  if (!listErr && remainingAssets && remainingAssets.length > 0) {
-    const reindexPromises = remainingAssets.map((asset, index) =>
-      supabase
-        .from('content_assets')
-        .update({ display_order: index })
-        .eq('id', asset.id)
-    );
-    await Promise.all(reindexPromises);
-  }
+  const { error } = await supabase.rpc('mutate_content_asset_version', { p_content_id: contentId, p_target_id: assetId, p_remove: true });
+  if (error) throw new Error(error.message || 'Erro ao desativar arquivo.');
 }
 
 /**

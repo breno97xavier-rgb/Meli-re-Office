@@ -39,10 +39,10 @@ export function usePublicPresentation(token: string | null | undefined) {
       if (presentation.items && presentation.items.length > 0) {
         setAssetsResolving(true);
         try {
-          const urls = await resolvePublicPresentationSignedUrls(presentation.items, 7200);
+          const urls = await resolvePublicPresentationSignedUrls(token.trim());
           setSignedUrls(urls);
         } catch (assetErr) {
-          console.warn('[usePublicPresentation] Could not resolve asset signed URLs:', assetErr);
+          throw new Error('Os arquivos desta versão não puderam ser carregados. Atualize a página antes de avaliar.');
         } finally {
           setAssetsResolving(false);
         }
@@ -59,7 +59,18 @@ export function usePublicPresentation(token: string | null | undefined) {
 
   useEffect(() => {
     loadPresentation();
-  }, [loadPresentation]);
+    let active = true;
+    // Renew short-lived media URLs without closing an open feedback form.
+    const refresh = setInterval(() => {
+      if (!token?.trim()) return;
+      void resolvePublicPresentationSignedUrls(token.trim()).then(urls => {
+        if (active) setSignedUrls(urls);
+      }).catch(() => {
+        if (active) { setError(parsePublicPresentationError(new Error('Arquivos indisponíveis. Atualize a página.'))); setData(null); }
+      });
+    }, 240000);
+    return () => { active = false; clearInterval(refresh); };
+  }, [loadPresentation, token]);
 
   const updateItemDecision = useCallback(
     (response: {

@@ -1,3 +1,4 @@
+import { useOfficeConfirm } from '../shared/OfficeConfirmProvider';
 import React, { useState, useEffect, useCallback } from 'react';
 import type { Client } from '../../types/clients';
 import {
@@ -38,6 +39,7 @@ export const EditorialCyclesSection: React.FC<EditorialCyclesSectionProps> = ({
   clientId,
   clientPillars,
 }) => {
+  const confirm = useOfficeConfirm();
   const [includeArchived, setIncludeArchived] = useState<boolean>(false);
   const [executionDirty, setExecutionDirty] = useState(false);
   const handleExecutionDirty = useCallback((dirty: boolean) => { setExecutionDirty(dirty); onDirty(dirty); }, [onDirty]);
@@ -292,7 +294,7 @@ export const EditorialCyclesSection: React.FC<EditorialCyclesSectionProps> = ({
         clients={clients}
         onDirty={handleExecutionDirty}
         isOpen={Boolean(selectedPlanForDetail)}
-        onClose={() => { if (!executionDirty || window.confirm('Fechar a execução? Alterações ainda não salvas serão descartadas.')) setSelectedPlanForDetail(null); }}
+        onClose={async () => { if (!executionDirty || await confirm('Fechar a execução? Alterações ainda não salvas serão descartadas.')) setSelectedPlanForDetail(null); }}
         plan={selectedPlanForDetail}
         clientPillars={clientPillars}
         onEdit={(p) => {

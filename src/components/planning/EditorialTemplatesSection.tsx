@@ -1,3 +1,4 @@
+import { useOfficeConfirm } from '../shared/OfficeConfirmProvider';
 import { useEffect, useRef, useState } from 'react';
 import type { Campaign, ClientPillar } from '../../types/planning';
 import type { EditorialSeries } from '../../types/planningFoundation';
@@ -13,6 +14,7 @@ const field = 'mt-1 w-full rounded-lg border border-[#E8E9EA] bg-white p-2 text-
 const button = 'rounded-lg border border-[#E8E9EA] bg-white px-3 py-2 text-sm disabled:opacity-50';
 
 export function EditorialTemplatesSection({ clientId, pillars, onDirty }: { clientId: string; pillars: ClientPillar[]; onDirty: (dirty: boolean) => void }) {
+  const confirm = useOfficeConfirm();
   const [templates, setTemplates] = useState<EditorialTemplate[]>([]);
   const [draft, setDraft] = useState<EditorialTemplateDraft | null>(null);
   const [series, setSeries] = useState<EditorialSeries[]>([]), [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -31,8 +33,8 @@ export function EditorialTemplatesSection({ clientId, pillars, onDirty }: { clie
   }, [clientId, reload]);
   useEffect(() => { onDirty(dirty || saving); return () => onDirty(false); }, [dirty, saving, onDirty]);
 
-  function choose(next: EditorialTemplateDraft | null, unsaved = false) {
-    if (saving || (dirty && !window.confirm('Descartar alterações não salvas deste modelo?'))) return;
+  async function choose(next: EditorialTemplateDraft | null, unsaved = false) {
+    if (saving || (dirty && !await confirm('Descartar alterações não salvas deste modelo?'))) return;
     historyRequest.current++; setDraft(next); setDirty(unsaved); setSlotId(null); setFilter({}); setHistory(null); setHistoryLoading(false); setMessage('');
   }
   function change(input: Partial<EditorialTemplateDraft>) { setDraft(current => current ? { ...current, ...input } : null); setDirty(true); setMessage(''); setHistory(null); historyRequest.current++; setHistoryLoading(false); }
@@ -61,7 +63,7 @@ export function EditorialTemplatesSection({ clientId, pillars, onDirty }: { clie
     <div className="rounded-xl border bg-white p-5 space-y-3"><div className="flex flex-wrap justify-between gap-3"><h2 className="font-semibold">Grade editorial reutilizável</h2><button type="button" className={button} disabled={!loaded || saving} onClick={() => choose({ id: crypto.randomUUID(), client_id: clientId, name: 'Novo modelo', notes: '', position_count: 14, slots: [], revision: 0, is_active: true }, true)}>+ Novo modelo</button></div>
       <p className="text-sm text-zinc-500">Posições relativas não são dias da semana nem datas. Um modelo pode ser usado em ciclos futuros com novos assuntos.</p>
       {loading && <p role="status">Carregando modelos…</p>}
-      {error && <div role="alert" className="text-sm text-red-700"><p>{error}</p><button type="button" className="mt-2 underline" disabled={saving || loading} onClick={() => { if (!dirty || window.confirm('Atualizar e descartar o rascunho do modelo?')) setReload(value => value + 1); }}>Atualizar modelos</button></div>}
+      {error && <div role="alert" className="text-sm text-red-700"><p>{error}</p><button type="button" className="mt-2 underline" disabled={saving || loading} onClick={async () => { if (!dirty || await confirm('Atualizar e descartar o rascunho do modelo?')) setReload(value => value + 1); }}>Atualizar modelos</button></div>}
       {message && <p role="status" className="text-sm text-emerald-700">{message}</p>}
       {loaded && !templates.length && <p className="rounded-lg bg-zinc-50 p-4 text-sm">Nenhum modelo salvo. Planejamento editorial é opcional.</p>}
       <div className="flex flex-wrap gap-2">{templates.map(model => <button type="button" key={model.id} disabled={saving || !loaded} className={`${button} text-left ${draft?.id === model.id ? 'ring-2 ring-[#F3705A]' : ''}`} onClick={() => choose(model)}>{model.name}<span className="block text-xs text-zinc-500">v{model.revision} · {model.position_count} posições · {model.is_active ? 'Ativo' : 'Arquivado'}</span></button>)}</div>
@@ -70,7 +72,7 @@ export function EditorialTemplatesSection({ clientId, pillars, onDirty }: { clie
       <div className="rounded-xl border bg-white p-5 space-y-4">
         <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Nome do modelo<input className={field} value={draft.name} onChange={event => change({ name: event.target.value })}/></label>
           <label className="text-sm">Quantidade de posições<input type="number" min={1} max={366} step={1} className={field} value={draft.position_count} onChange={event => { const count = Number(event.target.value); if (!Number.isInteger(count) || count < 1 || count > 366) { setError('Use entre 1 e 366 posições.'); return; } if (draft.slots.some(slot => slot.position > count)) { setError('Mova também as vagas arquivadas antes de reduzir a grade. Nenhuma vaga foi removida.'); return; } change({ position_count: count }); setError(''); }}/></label></div>
-        <div className="flex flex-wrap gap-2">{[[7, '1 semana'], [14, '2 semanas'], [28, '4 semanas']].map(([count, label]) => <button type="button" key={count} className={button} onClick={() => { if (draft.slots.some(slot => slot.position > Number(count))) { setError('Mova as vagas antes de reduzir a grade.'); return; } change({ position_count: Number(count) }); }}>{label} · {count} posições</button>)}</div>
+        <div className="flex flex-wrap gap-2">{[[7, '1 semana'], [14, '2 semanas'], [28, '4 semanas']].map(([count, label]) => <button type="button" key={count} className={button} onClick={async () => { if (draft.slots.some(slot => slot.position > Number(count))) { setError('Mova as vagas antes de reduzir a grade.'); return; } change({ position_count: Number(count) }); }}>{label} · {count} posições</button>)}</div>
         <label className="block text-sm">Observações<textarea className={field} rows={2} value={draft.notes} onChange={event => change({ notes: event.target.value })}/></label>
         <div className="flex flex-wrap items-center justify-between gap-3"><label className="flex gap-2 text-sm"><input type="checkbox" checked={draft.is_active} onChange={event => change({ is_active: event.target.checked })}/>Modelo ativo</label>
           <div className="flex flex-wrap gap-2"><button type="button" className={button} onClick={() => choose(duplicateEditorialTemplate(draft, () => crypto.randomUUID()), true)}>Duplicar modelo</button><button type="button" className={button} onClick={() => choose(null)}>Fechar modelo</button><button type="button" disabled={!dirty || saving} className="rounded-lg bg-[#1D1D1D] px-4 py-2 text-sm text-white disabled:opacity-50" onClick={() => void save()}>{saving ? 'Salvando…' : 'Salvar modelo'}</button></div></div>

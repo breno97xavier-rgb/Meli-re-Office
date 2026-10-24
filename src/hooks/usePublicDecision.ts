@@ -36,7 +36,8 @@ export function usePublicDecision({
     async (
       itemId: string,
       status: 'approved' | 'changes_requested' | 'rejected',
-      feedback?: string | null
+      feedback?: string | null,
+      reviewId?: string | null
     ) => {
       if (!token || !token.trim()) {
         const err: PublicDecisionError = {
@@ -62,6 +63,7 @@ export function usePublicDecision({
           itemId,
           status,
           feedback,
+          reviewId,
         });
 
         // Notify parent state for instant local update

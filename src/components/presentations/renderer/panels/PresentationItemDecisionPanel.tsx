@@ -13,6 +13,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { PresentationItem } from '../../../../types/presentations';
+import { ReviewVersionNotice } from '../../ReviewVersionNotice';
 
 interface PresentationItemDecisionPanelProps {
   item: PresentationItem;
@@ -117,10 +118,13 @@ export const PresentationItemDecisionPanel: React.FC<PresentationItemDecisionPan
     }
   };
 
+  if (!item.review_id) return <ReviewVersionNotice item={item} publicMode={isPublic} />;
+
   return (
     <>
       {/* Main Container */}
       <div className="bg-white border border-[#E8E9EA] rounded-2xl p-5 shadow-xs space-y-4">
+        <ReviewVersionNotice item={item} publicMode={isPublic} />
         {/* Header Title */}
         <div className="flex items-center justify-between border-b border-[#F2F3F3] pb-3">
           <div className="flex items-center gap-2">
@@ -229,7 +233,7 @@ export const PresentationItemDecisionPanel: React.FC<PresentationItemDecisionPan
                     )}
                   </div>
                   <p className="text-xs text-emerald-800 leading-relaxed">
-                    Esta publicação foi aprovada e está pronta para agendamento.
+                    Esta versão foi aprovada nesta rodada. Alterações na peça precisam de nova avaliação.
                   </p>
                 </div>
               </div>

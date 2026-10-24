@@ -68,6 +68,11 @@ export interface Presentation {
 }
 
 export interface PresentationItem {
+  review_id?: string | null;
+  review_prepared_at?: string | null;
+  review_content?: Content | null;
+  review_assets?: ContentAsset[] | null;
+  review_material_revision?: number | null;
   id: string;
   presentation_id: string;
   content_id: string;
@@ -106,6 +111,7 @@ export interface CreatePresentationItemInput {
 }
 
 export interface UpdatePresentationItemInput {
+  review_id?: string | null;
   display_order?: number;
   presentation_notes?: string | null;
   client_approval_status?: PresentationItemApprovalStatus;
@@ -180,6 +186,7 @@ export interface PublicPresentationData extends Presentation {
 }
 
 export interface PublicDecisionSubmissionInput {
+  reviewId?: string | null;
   token: string;
   itemId: string;
   status: 'approved' | 'changes_requested' | 'rejected';

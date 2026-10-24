@@ -164,19 +164,22 @@ export function usePresentationEditor(presentationId: string) {
   // Update item client approval status (internal admin adjustment)
   const handleUpdateItemApprovalStatus = async (
     itemId: string,
-    status: string
+    status: string,
+    feedback?: string
   ): Promise<void> => {
     if (!itemId) return;
     setSavingItemId(itemId);
     try {
-      const updated = await updatePresentationItem(itemId, { client_approval_status: status });
+      const updated = await updatePresentationItem(itemId, { client_approval_status: status,
+        review_id: items.find(item => item.id === itemId)?.review_id, client_feedback: feedback });
       setItems((prev) =>
         prev.map((item) =>
           item.id === itemId
-            ? { ...item, client_approval_status: updated.client_approval_status }
+              ? updated
             : item
         )
       );
+      await loadData();
     } catch (err: unknown) {
       console.error('Error updating approval status:', err);
       throw err;

@@ -13,6 +13,7 @@ export interface PublicDecisionError {
     | 'INVALID_DECISION_STATUS'
     | 'FEEDBACK_REQUIRED'
     | 'ITEM_ALREADY_REVIEWED'
+    | 'REVIEW_VERSION_REQUIRED'
     | 'UNKNOWN_ERROR';
   title: string;
   message: string;
@@ -27,6 +28,10 @@ export function parsePublicDecisionError(err: unknown): PublicDecisionError {
   const errObj = err as { message?: string; details?: string; hint?: string; code?: string };
   const msg = typeof err === 'string' ? err : errObj?.message || errObj?.details || '';
   const lowerMsg = msg.toLowerCase();
+  if (lowerMsg.includes('review_version_required')) return {
+    code: 'REVIEW_VERSION_REQUIRED', title: 'Versão não disponível para avaliação',
+    message: 'Atualize a página. Se o aviso continuar, solicite uma nova rodada à agência.',
+  };
 
   if (
     lowerMsg.includes('item_already_reviewed') ||
@@ -155,9 +160,11 @@ export async function submitPublicPresentationDecision(
     throw new Error('FEEDBACK_REQUIRED');
   }
 
-  const { data, error } = await supabase.rpc('submit_public_presentation_decision', {
+  if (!input.reviewId) throw new Error('REVIEW_VERSION_REQUIRED');
+  const { data, error } = await supabase.rpc('submit_presentation_review_decision', {
     p_token: token,
     p_item_id: itemId,
+    p_review_id: input.reviewId,
     p_status: status,
     p_feedback: feedback || null,
   });
@@ -172,6 +179,8 @@ export async function submitPublicPresentationDecision(
   }
 
   const res = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>;
+  if (res.review_id !== input.reviewId || res.item_id !== itemId || !res.reviewed_at
+    || !res.presentation_id || res.client_approval_status !== status) throw new Error('INVALID_RESPONSE');
 
   return {
     item_id: String(res.item_id || itemId),

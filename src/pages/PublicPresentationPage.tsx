@@ -141,7 +141,7 @@ export const PublicPresentationPage: React.FC<PublicPresentationPageProps> = ({ 
   const pendingCount = items.filter(
     (i) => (i.client_approval_status || 'pending') === 'pending'
   ).length;
-  const isAllReviewed = items.length > 0 && pendingCount === 0;
+  const isAllReviewed = items.length > 0 && pendingCount === 0 && items.every(item => item.review_id);
 
   // 4. SHARED PRESENTATION RENDERER (Public Context)
   return (
@@ -221,7 +221,8 @@ export const PublicPresentationPage: React.FC<PublicPresentationPageProps> = ({ 
         signedUrls={signedUrls}
         mode="public"
         submittingDecision={Boolean(submittingItemId)}
-        onSubmitDecision={submitDecision}
+        onSubmitDecision={(itemId, status, feedback) => submitDecision(itemId, status, feedback,
+          items.find(item => item.id === itemId)?.review_id)}
       />
     </div>
   );

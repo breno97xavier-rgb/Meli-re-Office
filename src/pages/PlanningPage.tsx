@@ -13,8 +13,11 @@ import { EditorialPillarsSection } from '../components/planning/EditorialPillars
 import { EditorialCyclesSection } from '../components/planning/EditorialCyclesSection';
 import { CampaignsSection } from '../components/planning/CampaignsSection';
 import { Building2 } from 'lucide-react';
+import { OfficeConfirmProvider, useOfficeConfirm } from '../components/shared/OfficeConfirmProvider';
 
-export const PlanningPage: React.FC = () => {
+export const PlanningPage: React.FC = () => <OfficeConfirmProvider><PlanningContent/></OfficeConfirmProvider>;
+
+const PlanningContent: React.FC = () => {
   const { clients, loading: loadingClients } = useClients();
   const [selectedClientId, setSelectedClientId] = useState<string>('');
 
@@ -36,17 +39,21 @@ export const PlanningPage: React.FC = () => {
 };
 
 const ClientPlanningWorkspace: React.FC<{clients:Client[];selectedClientId:string;loadingClients:boolean;onSelectClient:(id:string)=>void}> = ({clients,selectedClientId,loadingClients,onSelectClient}) => {
+  const confirm = useOfficeConfirm();
   const [tab,setTab]=useState('strategy');
   const [dirty,setDirty]=useState(false);
   const onDirty=useCallback((value:boolean)=>setDirty(value),[]);
-  const canLeave=()=>!dirty||window.confirm('Descartar alterações não salvas deste planejamento?');
+  const canLeave=async()=>!dirty||await confirm('Há alterações não salvas neste planejamento. Descartar o preenchimento e continuar?');
   useEffect(()=>{
     const guard=(event:Event)=>{
-      if(dirty&&!window.confirm('Descartar alterações não salvas deste planejamento?'))event.preventDefault();
+      if (!dirty) return;
+      event.preventDefault();
+      const proceed = (event as CustomEvent<{proceed?:()=>void}>).detail?.proceed;
+      if (proceed) void confirm('Há alterações não salvas neste planejamento. Descartar e sair para outra página?').then(accepted => { if (accepted) { setDirty(false); proceed(); } });
     };
     window.addEventListener('meliere:before-navigate',guard);
     return()=>window.removeEventListener('meliere:before-navigate',guard);
-  },[dirty]);
+  },[dirty,confirm]);
   useEffect(()=>{const guard=(event:BeforeUnloadEvent)=>{if(dirty){event.preventDefault();event.returnValue='';}};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);},[dirty]);
 
   // Strategy hook
@@ -79,7 +86,7 @@ const ClientPlanningWorkspace: React.FC<{clients:Client[];selectedClientId:strin
       <PlanningHeader
         clients={clients}
         selectedClientId={selectedClientId}
-        onSelectClient={id=>{if(canLeave())onSelectClient(id);}}
+        onSelectClient={async id=>{if(await canLeave())onSelectClient(id);}}
         loadingClients={loadingClients}
       />
 
@@ -108,7 +115,7 @@ const ClientPlanningWorkspace: React.FC<{clients:Client[];selectedClientId:strin
         <div className="space-y-6">
           <p className="text-sm text-[#666668]">Briefing, estratégia e séries são opcionais. Clientes de sites, branding ou serviços avulsos podem continuar sem planejamento editorial.</p>
           <div role="tablist" aria-label="Áreas do planejamento" className="flex flex-wrap gap-2 border-b border-[#E8E9EA] pb-3">
-            {[['strategy','Estratégia'],['briefing','Briefing'],['pillars','Pilares e séries'],['templates','Grade editorial'],['cycles','Ciclos editoriais'],['campaigns','Campanhas']].map(([id,label])=><button key={id} id={`planning-tab-${id}`} type="button" role="tab" aria-selected={tab===id} aria-controls={`planning-panel-${id}`} tabIndex={tab===id?0:-1} onKeyDown={event=>{if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();const ids=['strategy','briefing','pillars','templates','cycles','campaigns'];const next=ids[(ids.indexOf(tab)+(event.key==='ArrowRight'?1:ids.length-1))%ids.length];if(canLeave()){setDirty(false);setTab(next);requestAnimationFrame(()=>document.getElementById(`planning-tab-${next}`)?.focus());}}}} onClick={()=>{if(id!==tab&&canLeave()){setDirty(false);setTab(id);}}} className={`rounded-lg px-4 py-2 text-sm ${tab===id?'bg-[#1D1D1D] text-white':'bg-white text-[#666668] hover:bg-[#EDEEEE]'}`}>{label}</button>)}
+            {[['strategy','Estratégia'],['briefing','Briefing'],['pillars','Pilares e séries'],['templates','Grade editorial'],['cycles','Ciclos editoriais'],['campaigns','Campanhas']].map(([id,label])=><button key={id} id={`planning-tab-${id}`} type="button" role="tab" aria-selected={tab===id} aria-controls={`planning-panel-${id}`} tabIndex={tab===id?0:-1} onKeyDown={async event=>{if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();const ids=['strategy','briefing','pillars','templates','cycles','campaigns'];const next=ids[(ids.indexOf(tab)+(event.key==='ArrowRight'?1:ids.length-1))%ids.length];if(await canLeave()){setDirty(false);setTab(next);requestAnimationFrame(()=>document.getElementById(`planning-tab-${next}`)?.focus());}}}} onClick={async()=>{if(id!==tab&&await canLeave()){setDirty(false);setTab(id);}}} className={`rounded-lg px-4 py-2 text-sm ${tab===id?'bg-[#1D1D1D] text-white':'bg-white text-[#666668] hover:bg-[#EDEEEE]'}`}>{label}</button>)}
           </div>
           <div role="tabpanel" id={`planning-panel-${tab}`} aria-labelledby={`planning-tab-${tab}`} className="space-y-5">
           {tab==='briefing'&&<BriefingSection clientId={selectedClientId} onDirty={onDirty}/>}

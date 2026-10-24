@@ -7,6 +7,8 @@ import { SourceTextModule, SyntheticModule, createContext } from 'node:vm';
 async function load(results, { uploadError = null } = {}) {
   const calls = [];
   const supabase = {
+    async rpc(name, params) { calls.push({ kind: 'rpc', name, params });
+      if (!results.length) throw new Error('Unexpected RPC request'); return results.shift(); },
     from(table) {
       const call = { kind: 'db', table, filters: [] }; calls.push(call);
       return {
@@ -102,15 +104,31 @@ for (const badTarget of [{ ...target, content_id: 'other-content' }, { ...target
 }
 
 test('replacement checks current target and scopes the mutation to the same content', async () => {
-  const { service, calls } = await load([ok(target), ...ownership(), ok({ id: 'old' }), ok({ id: 'new' })]);
+  const { service, calls } = await load([ok(target), ...ownership(), ok({ id: 'new' })]);
   await service.replaceContentAsset({ ...input, targetAssetId: 'old' });
-  const changed = calls.find(call => call.update);
-  assert.deepEqual(changed.filters, [['id', 'old'], ['content_id', 'content'], ['is_current', true]]);
-  assert.equal(calls.find(call => call.insert).insert[0].version, 3);
+  const changed = calls.find(call => call.kind === 'rpc');
+  assert.equal(changed.name, 'mutate_content_asset_version');
+  assert.equal(changed.params.p_content_id, 'content');
+  assert.equal(changed.params.p_target_id, 'old');
+  assert.equal(changed.params.p_file.file_url, calls.find(call => call.kind === 'upload').path);
+  assert.equal(calls.some(call => call.update || call.insert), false);
 });
 
 test('preview uses temporary signed URL from the private bucket', async () => {
   const { service, calls } = await load([]);
   assert.equal(await service.getContentAssetSignedUrl('synthetic-path'), 'https://example.test/private-media');
   assert.deepEqual(calls, [{ kind: 'sign', bucket: 'content-assets', path: 'synthetic-path', expiry: 3600 }]);
+});
+
+test('ambiguous replacement result never deletes a file that may already be committed', async () => {
+  const { service, calls } = await load([ok(target), ...ownership(), { data: null, error: { message: 'Network failure' } }]);
+  await assert.rejects(service.replaceContentAsset({ ...input, targetAssetId: 'old' }));
+  assert.equal(calls.some(call => call.kind === 'remove'), false);
+});
+
+test('confirmed transactional rejection removes only this attempt file without rewriting the previous version', async () => {
+  const { service, calls } = await load([ok(target), ...ownership(), { data: null, error: { code: 'P0001', message: 'CURRENT_ASSET_NOT_FOUND' } }]);
+  await assert.rejects(service.replaceContentAsset({ ...input, targetAssetId: 'old' }));
+  assert.deepEqual(calls.at(-1).paths, [calls.find(call => call.kind === 'upload').path]);
+  assert.equal(calls.some(call => call.update), false);
 });

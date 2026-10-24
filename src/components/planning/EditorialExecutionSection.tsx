@@ -1,3 +1,4 @@
+import { useOfficeConfirm } from '../shared/OfficeConfirmProvider';
 import React, { useEffect, useRef, useState } from 'react';
 import type { Client } from '../../types/clients';
 import type { EditorialPlan } from '../../types/planning';
@@ -15,6 +16,7 @@ import { parseCivilDate } from '../../utils/civilDate';
 const button = 'rounded-lg border border-[#E8E9EA] px-3 py-2 text-sm min-h-11 disabled:opacity-50';
 const inputClass = 'block w-full rounded-lg border border-[#E8E9EA] p-2 text-sm min-h-11';
 export const EditorialExecutionSection: React.FC<{ plan: EditorialPlan; clients: Client[]; onDirty: (value: boolean) => void }> = ({ plan, clients, onDirty }) => {
+  const confirm = useOfficeConfirm();
   const [application, setApplication] = useState<EditorialApplication | null>(null);
   const [templates, setTemplates] = useState<EditorialTemplate[]>([]), [links, setLinks] = useState<EditorialContentLink[]>([]);
   const [modelId, setModelId] = useState(''), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
@@ -44,8 +46,8 @@ export const EditorialExecutionSection: React.FC<{ plan: EditorialPlan; clients:
     try { await action(); } catch (failure) { if (alive.current) setError(executionError(failure)); }
     finally { lock.current = false; if (alive.current) setBusy(false); }
   }
-  function start(slot: EditorialTemplateSlot, unit: number, mode: 'create' | 'link') {
-    if (busy || (selection && !window.confirm('Descartar o preenchimento desta vaga?'))) return;
+  async function start(slot: EditorialTemplateSlot, unit: number, mode: 'create' | 'link') {
+    if (busy || (selection && !await confirm('Descartar o preenchimento desta vaga?'))) return;
     setSelection({ slot, unit, mode }); setTitle(slot.title); setFormat(slot.format || ''); setDate(''); setExistingId(''); setPieces([]); setError('');
     const current = ++request.current;
     if (mode === 'link') void fetchContents(plan.client_id).then(rows => {

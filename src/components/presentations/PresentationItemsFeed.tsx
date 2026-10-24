@@ -4,6 +4,7 @@ import type { PresentationItem } from '../../types/presentations';
 import { selectContentCover } from '../../services/contentMediaContracts';
 import { ContentMediaPreview } from '../contents/ContentMediaPreview';
 import { PresentationItemApprovalBadge } from './PresentationStatusBadge';
+import { reviewLabel } from '../../services/presentationReviewContracts';
 import { PresentationItemCard, type PresentationItemCardProps } from './PresentationItemCard';
 
 interface Props extends Omit<PresentationItemCardProps, 'item' | 'index' | 'totalItems' | 'isSavingNotes' | 'onDirtyChange' | 'saveNotesOnBlur'> {
@@ -46,7 +47,9 @@ export function PresentationItemsFeed({ items, signedUrls, savingItemId, actionL
             <ContentMediaPreview asset={cover} url={cover ? signedUrls[cover.file_url] : undefined} title={title} />
             <span className="absolute left-3 top-3 rounded-lg bg-black/60 px-2 py-1 text-xs font-bold text-white">#{position + 1}</span>
           </div>
-          <div className="space-y-2 p-3"><p className="truncate text-sm font-semibold text-[#1D1D1D]">{title}</p><PresentationItemApprovalBadge status={item.client_approval_status} /></div>
+          <div className="space-y-2 p-3"><p className="truncate text-sm font-semibold text-[#1D1D1D]">{title}</p>
+            {item.review_id ? <PresentationItemApprovalBadge status={item.client_approval_status} /> : <p className="text-xs text-amber-800">{reviewLabel(item)}</p>}
+          </div>
         </button>;
       })}
     </div>

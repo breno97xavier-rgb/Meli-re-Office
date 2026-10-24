@@ -20,7 +20,7 @@ async function routerHarness() {
     useCallback(fn) { return fn; },
     useEffect(fn) { cleanup.push(fn()); },
   };
-  const context = createContext({ window, Event });
+  const context = createContext({ window, Event, CustomEvent });
   const code = stripTypeScriptTypes(readFileSync(new URL('../../src/hooks/useRouter.ts', import.meta.url), 'utf8'), { mode: 'transform' });
   const module = new SourceTextModule(code, { context });
   await module.link(() => new SyntheticModule(Object.keys(react), function () {
@@ -62,4 +62,14 @@ test('selecting current route does not ask to discard a draft', async () => {
   assert.equal(checks, 0);
   assert.deepEqual(h.pushes, []);
   h.unmount();
+});
+
+test('in-app confirmation can resume a previously blocked route without a second navigation prompt', async () => {
+  const h = await routerHarness(); let proceed; let checks = 0;
+  h.window.addEventListener('meliere:before-navigate', event => { checks++; event.preventDefault(); proceed = event.detail.proceed; });
+  h.router.navigate('/conteudos');
+  assert.equal(h.window.location.pathname, '/planejamento');
+  proceed();
+  assert.equal(h.window.location.pathname, '/conteudos');
+  assert.equal(checks, 1); assert.deepEqual(h.pushes, ['/conteudos']); h.unmount();
 });

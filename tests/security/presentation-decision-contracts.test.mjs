@@ -6,6 +6,25 @@ import {
   normalizePublicPresentationData,
 } from '../../src/services/presentationDecisionContracts.ts';
 
+test('public media paths reach the renderer without discarding version identity or mutating the RPC payload', () => {
+  const asset = { id: 'asset-v2', storage_path: 'workspace/a/clients/b/contents/c/v2.png', version: 2, display_order: 0 };
+  const raw = { presentation: { id: 'round-a' }, items: [{ id: 'item-a', content: { id: 'content-a' }, assets: [asset] }] };
+  const normalized = normalizePublicPresentationData(raw).items[0].assets[0];
+  assert.equal(normalized.file_url, asset.storage_path);
+  assert.equal(normalized.id, 'asset-v2');
+  assert.equal(normalized.version, 2);
+  assert.equal(Object.hasOwn(asset, 'file_url'), false);
+});
+
+test('canonical media path takes precedence and missing paths remain unavailable', () => {
+  const result = normalizePublicPresentationData({ presentation: { id: 'round-a' }, items: [{ id: 'item-a', assets: [
+    { id: 'one', file_url: 'canonical.png', storage_path: 'legacy.png' },
+    { id: 'two', storage_path: null },
+  ] }] });
+  assert.equal(result.items[0].assets[0].file_url, 'canonical.png');
+  assert.equal(result.items[0].assets[1].file_url, '');
+});
+
 test('current DB enums map to existing decision UI without hiding unknown statuses', () => {
   assert.equal(normalizeItemApprovalStatus('adjustments_requested'), 'changes_requested');
   assert.equal(normalizeItemApprovalStatus('approved'), 'approved');

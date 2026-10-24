@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePresentationEditor } from '../hooks/usePresentationEditor';
 import { useRouter } from '../hooks/useRouter';
+import { preparePresentationReview } from '../services/presentationsService';
 import type { RoutePath } from '../types';
 import { PresentationEditorHeader } from '../components/presentations/PresentationEditorHeader';
 import { PresentationItemsFeed } from '../components/presentations/PresentationItemsFeed';
@@ -48,6 +49,15 @@ export const PresentationEditorPage: React.FC<PresentationEditorPageProps> = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isNextRoundModalOpen, setIsNextRoundModalOpen] = useState(false);
+  const [preparingReview, setPreparingReview] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  async function prepareReview() {
+    if (preparingReview || !window.confirm('Preservar os textos e arquivos atuais para avaliação desta rodada? Alterações posteriores precisarão de uma nova rodada.')) return;
+    setPreparingReview(true); setReviewError('');
+    try { await preparePresentationReview(presentationId); await loadData(); }
+    catch (failure) { setReviewError(failure instanceof Error ? failure.message : 'Não foi possível preparar a versão.'); }
+    finally { setPreparingReview(false); }
+  }
 
   const handleBack = () => {
     navigate('/apresentacoes');
@@ -122,6 +132,16 @@ export const PresentationEditorPage: React.FC<PresentationEditorPageProps> = ({
         onNavigateToRound={handleNavigateToRound}
         onRefresh={loadData}
       />
+
+      <section aria-label="Versão para avaliação" className="rounded-xl border border-[#E8E9EA] bg-white p-4 space-y-2 text-sm">
+        <p>Prepare a versão quando os textos e arquivos estiverem prontos. A rodada preservará esses materiais para avaliação.</p>
+        {reviewError && <p role="alert" className="text-red-700">{reviewError}</p>}
+        <button type="button" onClick={() => void prepareReview()} className="rounded-lg border px-3 py-2 disabled:opacity-50"
+          disabled={preparingReview || !items.length || items.some(item => item.review_id || item.client_approval_status !== 'pending')}>
+          {preparingReview ? 'Preparando…' : items.some(item => item.review_id) ? 'Versão desta rodada preservada' : 'Preparar versão para avaliação'}
+        </button>
+        {items.some(item => !item.review_id && item.client_approval_status !== 'pending') && <p>Parecer histórico sem versão registrada. Use Nova Rodada para avaliar novos materiais.</p>}
+      </section>
 
       {/* Main Items Flow */}
       <div className="space-y-4">

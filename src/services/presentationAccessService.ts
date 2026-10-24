@@ -6,7 +6,6 @@ import {
   PublicPresentationError,
   PresentationItem,
 } from '../types/presentations';
-import { getContentAssetsSignedUrls } from './contentAssetsService';
 import {
   normalizePublicPresentationData,
 } from './presentationDecisionContracts';
@@ -36,6 +35,9 @@ function formatAccessError(err: unknown, fallbackMessage: string): string {
     if (record.message && typeof record.message === 'string') {
       if (record.message.includes('permission denied')) {
         return 'Permissão negada. É necessário estar autenticado como administrador para gerenciar links de acesso.';
+      }
+      if (record.message.includes('PREPARE_REVIEW_BEFORE_SHARING')) {
+        return 'Prepare a versão para avaliação no editor antes de gerar o link. Para pareceres antigos, use Nova Rodada.';
       }
       if (record.message.includes('NOT_FOUND') || record.message.includes('not found')) {
         return 'Apresentação ou link de acesso não encontrado.';
@@ -340,25 +342,8 @@ export async function fetchPublicPresentation(token: string): Promise<PublicPres
 /**
  * Resolves signed URLs for all assets referenced within a public presentation.
  */
-export async function resolvePublicPresentationSignedUrls(
-  items: PresentationItem[],
-  expiresInSeconds: number = 7200
-): Promise<Record<string, string>> {
-  if (!items || items.length === 0) return {};
-
-  const storagePaths: string[] = [];
-  for (const item of items) {
-    if (item.assets && Array.isArray(item.assets)) {
-      for (const asset of item.assets) {
-        if (asset.file_url && typeof asset.file_url === 'string') {
-          storagePaths.push(asset.file_url);
-        }
-      }
-    }
-  }
-
-  if (storagePaths.length === 0) return {};
-
-  return getContentAssetsSignedUrls(storagePaths, expiresInSeconds);
+export async function resolvePublicPresentationSignedUrls(token: string): Promise<Record<string, string>> {
+  const { data, error } = await supabase.functions.invoke('presentation-review-media', { body: { token } });
+  if (error || !data?.urls) throw new Error('Não foi possível carregar os arquivos desta versão. Atualize a página.');
+  return data.urls;
 }
-
