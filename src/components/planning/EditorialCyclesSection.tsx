@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import type { Client } from '../../types/clients';
 import {
   CalendarRange,
   Plus,
@@ -25,15 +26,21 @@ import { EditorialPlanDetailModal } from './EditorialPlanDetailModal';
 import { ArchivePlanConfirmModal } from './ArchivePlanConfirmModal';
 
 interface EditorialCyclesSectionProps {
+  clients: Client[];
+  onDirty: (value: boolean) => void;
   clientId: string;
   clientPillars: ClientPillar[];
 }
 
 export const EditorialCyclesSection: React.FC<EditorialCyclesSectionProps> = ({
+  clients,
+  onDirty,
   clientId,
   clientPillars,
 }) => {
   const [includeArchived, setIncludeArchived] = useState<boolean>(false);
+  const [executionDirty, setExecutionDirty] = useState(false);
+  const handleExecutionDirty = useCallback((dirty: boolean) => { setExecutionDirty(dirty); onDirty(dirty); }, [onDirty]);
 
   // Core hook
   const {
@@ -282,8 +289,10 @@ export const EditorialCyclesSection: React.FC<EditorialCyclesSectionProps> = ({
 
       {/* 7. Detail Modal */}
       <EditorialPlanDetailModal
+        clients={clients}
+        onDirty={handleExecutionDirty}
         isOpen={Boolean(selectedPlanForDetail)}
-        onClose={() => setSelectedPlanForDetail(null)}
+        onClose={() => { if (!executionDirty || window.confirm('Fechar a execução? Alterações ainda não salvas serão descartadas.')) setSelectedPlanForDetail(null); }}
         plan={selectedPlanForDetail}
         clientPillars={clientPillars}
         onEdit={(p) => {
@@ -293,7 +302,7 @@ export const EditorialCyclesSection: React.FC<EditorialCyclesSectionProps> = ({
         onSetStatus={handleSetStatus}
         onArchive={(p) => setPlanToArchive(p)}
         onSavePillarAllocations={handleSavePillarAllocations}
-        isMutating={mutating}
+        isMutating={mutating || executionDirty}
       />
 
       {/* 8. Archive Confirm Modal */}

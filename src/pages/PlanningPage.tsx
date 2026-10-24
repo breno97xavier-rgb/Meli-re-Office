@@ -144,6 +144,8 @@ const ClientPlanningWorkspace: React.FC<{clients:Client[];selectedClientId:strin
 
           {/* Section 3: Editorial Planning Cycles */}
           {tab==='cycles'&&<EditorialCyclesSection
+            clients={clients.filter(client => client.id === selectedClientId)}
+            onDirty={onDirty}
             clientId={selectedClientId}
             clientPillars={pillars}
           />}

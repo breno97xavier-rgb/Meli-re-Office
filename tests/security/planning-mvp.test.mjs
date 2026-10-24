@@ -25,6 +25,11 @@ async function load({ rpcError = null } = {}) {
   const code = stripTypeScriptTypes(readFileSync(new URL('../../src/services/planningService.ts', import.meta.url), 'utf8'), { mode: 'transform' });
   const module = new SourceTextModule(code, { context });
   await module.link(async specifier => {
+    if (specifier.endsWith('/utils/civilDate')) {
+      const actual = new SourceTextModule(stripTypeScriptTypes(readFileSync(new URL('../../src/utils/civilDate.ts', import.meta.url), 'utf8'), { mode: 'transform' }), { context });
+      await actual.link(() => { throw new Error('Unexpected civilDate dependency'); });
+      return actual;
+    }
     const declaration = code.match(new RegExp("import\\s*\\{([^}]+)\\}\\s*from\\s*['\"]" + specifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "['\"]"));
     const names = declaration[1].split(',').map(name => name.trim()).filter(Boolean);
     return new SyntheticModule(names, function () { for (const name of names) this.setExport(name, name === 'supabase' ? supabase : undefined); }, { context });
@@ -34,6 +39,19 @@ async function load({ rpcError = null } = {}) {
 }
 
 const validPlan = { title: ' Ciclo fictício ', start_date: '2026-11-01', end_date: '2026-11-30' };
+
+test('cycle without dates stays undated rather than receiving invented dates', async () => {
+  const { service } = await load();
+  const result = await service.createEditorialPlan('fictional-client', { title: 'Sem datas', start_date: null, end_date: null });
+  assert.equal(result.start_date, null); assert.equal(result.end_date, null);
+});
+test('partial and invalid civil periods are rejected before requests', async () => {
+  const { service, calls } = await load();
+  for (const period of [{ start_date: '2026-11-01', end_date: null }, { start_date: '2026-02-30', end_date: '2026-03-01' }, { start_date: '2026-12-01', end_date: '2026-11-01' }]) {
+    await assert.rejects(service.createEditorialPlan('fictional-client', { title: 'Inválido', ...period }));
+  }
+  assert.equal(calls.length, 0);
+});
 
 for (const method of ['createEditorialPlan', 'updateEditorialPlan', 'setEditorialPlanPillars']) {
   test(`${method}: invalid counts never start a request`, async () => {

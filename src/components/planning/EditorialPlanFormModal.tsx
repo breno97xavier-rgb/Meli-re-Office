@@ -104,13 +104,8 @@ export const EditorialPlanFormModal: React.FC<EditorialPlanFormModalProps> = ({
       return;
     }
 
-    if (!startDate) {
-      setValidationError('A data inicial é obrigatória.');
-      return;
-    }
-
-    if (!endDate) {
-      setValidationError('A data final é obrigatória.');
+    if (Boolean(startDate) !== Boolean(endDate)) {
+      setValidationError('Preencha as duas datas ou deixe ambas vazias para um ciclo sem período definido.');
       return;
     }
 
@@ -128,8 +123,8 @@ export const EditorialPlanFormModal: React.FC<EditorialPlanFormModalProps> = ({
 
     const payload: Omit<CreateEditorialPlanInput, 'client_id'> = {
       title: cleanTitle,
-      start_date: startDate,
-      end_date: endDate,
+      start_date: startDate || null,
+      end_date: endDate || null,
       primary_goal: primaryGoal.trim() || undefined,
       secondary_goals: secondaryGoals,
       core_message: coreMessage.trim() || undefined,
@@ -214,7 +209,7 @@ export const EditorialPlanFormModal: React.FC<EditorialPlanFormModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div>
                 <label htmlFor="plan-start-date" className="block text-xs font-semibold text-[#1D1D1D] mb-1">
-                  Data Inicial <span className="text-red-500">*</span>
+                  Data inicial (opcional)
                 </label>
                 <input
                   id="plan-start-date"
@@ -231,7 +226,7 @@ export const EditorialPlanFormModal: React.FC<EditorialPlanFormModalProps> = ({
 
               <div>
                 <label htmlFor="plan-end-date" className="block text-xs font-semibold text-[#1D1D1D] mb-1">
-                  Data Final <span className="text-red-500">*</span>
+                  Data final (opcional)
                 </label>
                 <input
                   id="plan-end-date"

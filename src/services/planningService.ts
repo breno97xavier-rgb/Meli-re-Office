@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { parseCivilDate } from '../utils/civilDate';
 import {
   ClientStrategy,
   ClientPillar,
@@ -612,15 +613,11 @@ export async function createEditorialPlan(
     throw new Error('O título do plano editorial é obrigatório.');
   }
 
-  if (!input.start_date) {
-    throw new Error('A data inicial do plano editorial é obrigatória.');
+  if (Boolean(input.start_date) !== Boolean(input.end_date) || (input.start_date && !parseCivilDate(input.start_date)) || (input.end_date && !parseCivilDate(input.end_date))) {
+    throw new Error('Preencha duas datas válidas ou deixe ambas vazias.');
   }
 
-  if (!input.end_date) {
-    throw new Error('A data final do plano editorial é obrigatória.');
-  }
-
-  if (input.end_date < input.start_date) {
+  if (input.start_date && input.end_date && input.end_date < input.start_date) {
     throw new Error('A data final deve ser igual ou posterior à data inicial.');
   }
 
@@ -644,8 +641,8 @@ export async function createEditorialPlan(
   const payload = {
     client_id: clientId,
     title: cleanTitle,
-    start_date: input.start_date,
-    end_date: input.end_date,
+    start_date: input.start_date || null,
+    end_date: input.end_date || null,
     primary_goal: input.primary_goal?.trim() || null,
     secondary_goals: secondaryGoals,
     core_message: input.core_message?.trim() || null,
@@ -695,22 +692,13 @@ export async function updateEditorialPlan(
     payload.title = cleanTitle;
   }
 
-  if (input.start_date !== undefined) {
-    if (!input.start_date) {
-      throw new Error('A data inicial não pode ser vazia.');
-    }
-    payload.start_date = input.start_date;
-  }
-
-  if (input.end_date !== undefined) {
-    if (!input.end_date) {
-      throw new Error('A data final não pode ser vazia.');
-    }
-    payload.end_date = input.end_date;
-  }
-
-  if (input.start_date && input.end_date && input.end_date < input.start_date) {
-    throw new Error('A data final deve ser igual ou posterior à data inicial.');
+  if (input.start_date !== undefined || input.end_date !== undefined) {
+    const current = input.start_date === undefined || input.end_date === undefined ? await getEditorialPlan(planId) : null;
+    const start = input.start_date === undefined ? current?.start_date : input.start_date;
+    const end = input.end_date === undefined ? current?.end_date : input.end_date;
+    if (Boolean(start) !== Boolean(end) || (start && !parseCivilDate(start)) || (end && !parseCivilDate(end)) || (start && end && end < start)) throw new Error('Preencha duas datas válidas ou deixe ambas vazias.');
+    if (input.start_date !== undefined) payload.start_date = input.start_date || null;
+    if (input.end_date !== undefined) payload.end_date = input.end_date || null;
   }
 
   if (input.primary_goal !== undefined) {

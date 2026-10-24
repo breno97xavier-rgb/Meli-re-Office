@@ -7,6 +7,7 @@ export default defineConfig({
  plugins:[{
   name:'planning-fictional-services',enforce:'pre',
   resolveId(source){
+   if(/\/services\/(editorialExecutionService|contentsService|contentAssetsService|contentMediaService)(?:\.ts)?$/.test(source))return path.resolve('tests/security/execution-preview-services.ts');
    if(/\/services\/(planningService|planningFoundationService|editorialTemplateService|clientsService)(?:\.ts)?$/.test(source))return path.resolve('tests/security/planning-preview-services.ts');
    if(/\/lib\/supabase(?:\.ts)?$/.test(source))return '\0planning-no-database';
   },

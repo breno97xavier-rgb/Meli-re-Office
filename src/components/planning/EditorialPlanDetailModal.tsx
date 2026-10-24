@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import type { Client } from '../../types/clients';
+import { EditorialExecutionSection } from './EditorialExecutionSection';
 import {
   X,
   Calendar,
@@ -31,6 +33,8 @@ import {
 } from '../../utils/planningFormatters';
 
 interface EditorialPlanDetailModalProps {
+  clients: Client[];
+  onDirty: (value: boolean) => void;
   isOpen: boolean;
   onClose: () => void;
   plan: EditorialPlan | null;
@@ -55,6 +59,8 @@ interface PillarRowState {
 }
 
 export const EditorialPlanDetailModal: React.FC<EditorialPlanDetailModalProps> = ({
+  clients,
+  onDirty,
   isOpen,
   onClose,
   plan,
@@ -283,6 +289,7 @@ export const EditorialPlanDetailModal: React.FC<EditorialPlanDetailModalProps> =
 
         {/* Modal Scrollable Body */}
         <div className="p-5 md:p-6 overflow-y-auto space-y-6 flex-1 bg-white">
+          <EditorialExecutionSection key={plan.id} plan={plan} clients={clients} onDirty={onDirty}/>
           {/* 1. Derived Metrics Dashboard Cards */}
           <div className="space-y-3">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

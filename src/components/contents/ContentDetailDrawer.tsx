@@ -142,7 +142,7 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
       setFormat(content.format || 'feed_single');
       setEditorialStatus(content.editorial_status || 'draft');
       setClientId(content.client_id || '');
-      setPrimaryChannel(content.primary_channel || 'instagram');
+      setPrimaryChannel(content.primary_channel || '');
       setGoal(content.goal || '');
       setFunnelStage(content.funnel_stage || '');
       setCopy(content.copy || '');
@@ -219,6 +219,7 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
     );
 
     const list = pillars.filter((p) => {
+      if (p.id === content?.pillar_id && editorialPlanId === content?.editorial_plan_id) return true;
       if (!allocatedPillarIds.has(p.id)) return false;
       if (p.is_active) return true;
       // Include inactive only if it is the currently bound pillar of this content
@@ -227,18 +228,20 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
 
     return {
       selectablePillars: list,
-      isCycleWithoutPillars: (selectedPlan.pillars || []).length === 0 || list.length === 0,
+      isCycleWithoutPillars: list.length === 0,
     };
-  }, [editorialPlanId, selectedPlan, activePillars, pillars, pillarId, currentBoundPillar, content?.pillar_id]);
+  }, [editorialPlanId, selectedPlan, activePillars, pillars, pillarId, currentBoundPillar, content?.pillar_id, content?.editorial_plan_id]);
 
   // Incompatibility check: operator has a pillar selected, but cycle changed and pillar is NOT in that cycle
   const isPillarIncompatible = useMemo(() => {
     if (!editorialPlanId || !pillarId || !selectedPlan) return false;
+    // Preserva a referência já gravada, inclusive quando veio de uma vaga sem alocação quantitativa.
+    if (editorialPlanId === content?.editorial_plan_id && pillarId === content?.pillar_id) return false;
     const allocatedPillarIds = new Set(
       (selectedPlan.pillars || []).map((pp) => pp.pillar_id)
     );
     return !allocatedPillarIds.has(pillarId);
-  }, [editorialPlanId, pillarId, selectedPlan]);
+  }, [editorialPlanId, pillarId, selectedPlan, content?.editorial_plan_id, content?.pillar_id]);
 
   // Selectable Campaigns: active campaigns + current campaign if completed/archived
   const selectableCampaigns = useMemo(() => {
@@ -340,7 +343,7 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
         pillar_id: pillarId || null,
         editorial_plan_id: editorialPlanId || null,
         campaign_id: campaignId || null,
-        funnel_stage: funnelStage ? funnelStage.trim().toLowerCase() : null,
+        funnel_stage: funnelStage ? funnelStage.trim() : null,
         copy: copy.trim() || null,
         caption: caption.trim() || null,
         script: content.script ?? null,
@@ -655,6 +658,8 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
                       onChange={(e) => setPrimaryChannel(e.target.value)}
                       className="w-full px-3 py-2 text-xs font-medium text-[#1D1D1D] bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg focus:outline-none focus:bg-white focus:border-[#1D1D1D] cursor-pointer"
                     >
+                      <option value="">Sem canal principal</option>
+                      {primaryChannel === 'newsletter' && <option value="newsletter">Newsletter</option>}
                       {PRIMARY_CHANNELS.map((ch) => (
                         <option key={ch.value} value={ch.value}>
                           {ch.label}
@@ -675,6 +680,7 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
                     className="w-full px-3 py-2 text-xs font-medium text-[#1D1D1D] bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg focus:outline-none focus:bg-white focus:border-[#1D1D1D] cursor-pointer"
                   >
                     <option value="">Selecione a etapa...</option>
+                    {funnelStage && !FUNNEL_STAGES.some(stage => stage.value === funnelStage) && <option value={funnelStage}>{funnelStage}</option>}
                     {FUNNEL_STAGES.map((st) => (
                       <option key={st.value} value={st.value}>
                         {st.label}
@@ -1018,6 +1024,9 @@ export const ContentDetailDrawer: React.FC<ContentDetailDrawerProps> = ({
                       className="w-full pl-9 pr-8 py-2 text-xs font-semibold text-[#1D1D1D] bg-[#F7F7F8] border border-[#E8E9EA] rounded-lg focus:outline-none focus:bg-white focus:border-[#1D1D1D] cursor-pointer"
                     >
                       <option value="">Não atribuído</option>
+                      {assignedTo && !teamProfiles.some(profile => profile.id === assignedTo) && (
+                        <option value={assignedTo}>{content.assigned_profile?.display_name || content.assigned_profile?.full_name || 'Responsável atual (preservado)'}</option>
+                      )}
                       {teamProfiles.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.display_name || p.full_name} ({p.role || 'Equipe'})

@@ -27,6 +27,9 @@ try {
  if ($Fixture -eq 'editorial-templates-lab.sql') {
   & (Join-Path $PSScriptRoot 'planning-foundation-concurrency.ps1') -Psql $psql -Connection "host=127.0.0.1 port=$Port user=office_lab dbname=postgres connect_timeout=5" -ArtifactPrefix ($data+'.template-concurrency') -Domain templates
  }
+ if ($Fixture -eq 'planning-cycle-contents-lab.sql') {
+  & (Join-Path $PSScriptRoot 'planning-cycle-concurrency.ps1') -Psql $psql -Connection "host=127.0.0.1 port=$Port user=office_lab dbname=postgres connect_timeout=5" -ArtifactPrefix ($data+'.cycles-concurrency')
+ }
 } finally {
  if ($started) { & $ctl -D $data -m fast -w stop }
  # Sem exclusão recursiva: cluster exclusivamente fictício permanece no TEMP.

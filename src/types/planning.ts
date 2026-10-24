@@ -38,8 +38,8 @@ export interface EditorialPlan {
   id: string;
   client_id: string;
   title: string;
-  start_date: string;
-  end_date: string;
+  start_date: string | null;
+  end_date: string | null;
   primary_goal?: string | null;
   secondary_goals: string[];
   core_message?: string | null;
@@ -123,8 +123,8 @@ export interface UpdateClientPillarInput {
 export interface CreateEditorialPlanInput {
   client_id: string;
   title: string;
-  start_date: string;
-  end_date: string;
+  start_date: string | null;
+  end_date: string | null;
   primary_goal?: string | null;
   secondary_goals?: string[];
   core_message?: string | null;
@@ -135,8 +135,8 @@ export interface CreateEditorialPlanInput {
 
 export interface UpdateEditorialPlanInput {
   title?: string;
-  start_date?: string;
-  end_date?: string;
+  start_date?: string | null;
+  end_date?: string | null;
   primary_goal?: string | null;
   secondary_goals?: string[];
   core_message?: string | null;

@@ -22,7 +22,9 @@ export async function saveBriefing(clientId:string,revision:number,questions:any
 }
 export async function saveStrategyRevision(clientId:string,revision:number,input:any){await pause();if(revision!==(strategies[clientId]?.revision||0))throw new Error('Conflito de revisão no teste.');const result={id:strategies[clientId]?.id||crypto.randomUUID(),client_id:clientId,...input,revision:revision+1};strategies[clientId]=result;(revisions.strategy[clientId]||=[]).push({revision:result.revision,snapshot:copy(result),changed_at:now()});return copy(result);}
 export async function saveEditorialSeries(clientId:string,input:any){await pause();if(input.revision!==(series[input.id]?.revision||0))throw new Error('Conflito de revisão no teste.');if(!input.name.trim())throw new Error('Informe o nome da série.');const result={...copy(input),client_id:clientId,revision:input.revision+1};series[input.id]=result;return copy(result);}
-export async function getEditorialPlans(){return [];}
+export const previewPlans=[{id:'00000000-0000-0000-0000-000000000301',client_id:clients[0].id,title:'Quinzena piloto — fictícia',start_date:null,end_date:null,status:'draft',target_posts_count:3,secondary_goals:[],pillars:[],created_at:now(),updated_at:now()}];
+export async function getEditorialPlans(clientId:string){return copy(previewPlans.filter(plan=>plan.client_id===clientId));}
+export async function fetchContentPlanningOptions(clientId:string){return {editorialPlans:await getEditorialPlans(clientId),pillars:await getClientPillars(clientId),campaigns:[]};}
 export async function getCampaigns(){return [];}
 export function calculateEditorialPlanMetrics(){return {target_posts_count:0,allocated_posts_count:0,unallocated_posts_count:0,overallocated:false,pillar_count:0};}
 // Ações legadas não fazem parte deste roteiro de QA: falham explicitamente.
@@ -31,6 +33,7 @@ export const updateClient=unavailable,createClientPillar=unavailable,updateClien
 
 
 const templates:Record<string,any>={};
+templates['00000000-0000-0000-0000-000000000302']={id:'00000000-0000-0000-0000-000000000302',client_id:clients[0].id,name:'Quinzenal piloto — fictício',position_count:14,notes:'',is_active:true,revision:1,created_at:now(),updated_at:now(),slots:[{id:'00000000-0000-0000-0000-000000000303',position:2,title:'Bastidores do café',guidance:'Mostrar o processo artesanal.',pillar_id:'00000000-0000-0000-0000-000000000041',series_id:null,campaign_id:null,objective:'Aproximar a marca do público',funnel:'Relacionamento',format:'reels',priority:'main',recurrence:'every_cycle',quantity:2,is_active:true,destinations:[{channel:'instagram',profile:'@cafe_horizonte'},{channel:'whatsapp',profile:'Comercial'}]}]};
 const templateHistory:Record<string,any[]>={};
 export async function getEditorialTemplates(clientId:string){await pause();return copy(Object.values(templates).filter((model:any)=>model.client_id===clientId));}
 export async function saveEditorialTemplate(clientId:string,draft:any){

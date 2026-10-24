@@ -435,7 +435,7 @@ export async function updateContent(
   if (input.goal !== undefined) payload.goal = input.goal?.trim() || null;
   if (input.pillar !== undefined) payload.pillar = input.pillar?.trim() || null;
   if (input.funnel_stage !== undefined) {
-    payload.funnel_stage = input.funnel_stage?.trim().toLowerCase() || null;
+    payload.funnel_stage = input.funnel_stage?.trim() || null;
   }
   if (input.copy !== undefined) payload.copy = input.copy?.trim() || null;
   if (input.visual_copy !== undefined) payload.visual_copy = input.visual_copy?.trim() || null;
