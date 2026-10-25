@@ -9,22 +9,31 @@ import { AddContentsToPresentationModal } from '../components/presentations/AddC
 import { EditPresentationModal } from '../components/presentations/EditPresentationModal';
 import { SharePresentationModal } from '../components/presentations/SharePresentationModal';
 import { CreateNextRoundModal } from '../components/presentations/CreateNextRoundModal';
+import { OfficeConfirmProvider, useOfficeConfirm } from '../components/shared/OfficeConfirmProvider';
 import {
   Layers,
   Plus,
   Loader2,
   AlertCircle,
   ArrowLeft,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface PresentationEditorPageProps {
   presentationId: string;
 }
 
-export const PresentationEditorPage: React.FC<PresentationEditorPageProps> = ({
+export const PresentationEditorPage: React.FC<PresentationEditorPageProps> = props => (
+  <OfficeConfirmProvider title="Preparar versão para avaliação?" cancelLabel="Cancelar" confirmLabel="Preparar versão">
+    <PresentationEditorContent {...props} />
+  </OfficeConfirmProvider>
+);
+
+const PresentationEditorContent: React.FC<PresentationEditorPageProps> = ({
   presentationId,
 }) => {
   const { navigate } = useRouter();
+  const confirm = useOfficeConfirm();
   const {
     presentation,
     items,
@@ -52,7 +61,7 @@ export const PresentationEditorPage: React.FC<PresentationEditorPageProps> = ({
   const [preparingReview, setPreparingReview] = useState(false);
   const [reviewError, setReviewError] = useState('');
   async function prepareReview() {
-    if (preparingReview || !window.confirm('Preservar os textos e arquivos atuais para avaliação desta rodada? Alterações posteriores precisarão de uma nova rodada.')) return;
+    if (preparingReview || !await confirm('Os textos e arquivos atuais ficarão preservados nesta rodada para avaliação do cliente. Para avaliar alterações posteriores, será necessário criar uma nova rodada.')) return;
     setPreparingReview(true); setReviewError('');
     try { await preparePresentationReview(presentationId); await loadData(); }
     catch (failure) { setReviewError(failure instanceof Error ? failure.message : 'Não foi possível preparar a versão.'); }
@@ -134,10 +143,12 @@ export const PresentationEditorPage: React.FC<PresentationEditorPageProps> = ({
       />
 
       <section aria-label="Versão para avaliação" className="rounded-xl border border-[#E8E9EA] bg-white p-4 space-y-2 text-sm">
+        <h2 className="flex items-center gap-2 font-bold text-[#1D1D1D]"><ShieldCheck aria-hidden="true" className="h-5 w-5 text-[#F15A3C]" />Versão para avaliação</h2>
         <p>Prepare a versão quando os textos e arquivos estiverem prontos. A rodada preservará esses materiais para avaliação.</p>
         {reviewError && <p role="alert" className="text-red-700">{reviewError}</p>}
-        <button type="button" onClick={() => void prepareReview()} className="rounded-lg border px-3 py-2 disabled:opacity-50"
+        <button type="button" onClick={() => void prepareReview()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#1D1D1D] bg-[#1D1D1D] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#333333] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F15A3C] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
           disabled={preparingReview || !items.length || items.some(item => item.review_id || item.client_approval_status !== 'pending')}>
+          {preparingReview ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <ShieldCheck aria-hidden="true" className="h-4 w-4" />}
           {preparingReview ? 'Preparando…' : items.some(item => item.review_id) ? 'Versão desta rodada preservada' : 'Preparar versão para avaliação'}
         </button>
         {items.some(item => !item.review_id && item.client_approval_status !== 'pending') && <p>Parecer histórico sem versão registrada. Use Nova Rodada para avaliar novos materiais.</p>}
