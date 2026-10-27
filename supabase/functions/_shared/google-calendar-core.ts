@@ -30,7 +30,7 @@ function normalizeEvent(event:any){
  if(!event||typeof event.id!=='string'||event.status==='cancelled'||!event.start||!event.end)return null;
  const allDay=typeof event.start.date==='string';const start=allDay?event.start.date:event.start.dateTime,end=allDay?event.end.date:event.end.dateTime;
  if(typeof start!=='string'||typeof end!=='string'||isNaN(Date.parse(start))||isNaN(Date.parse(end))||Date.parse(end)<=Date.parse(start))return null;
- return {id:event.id,title:typeof event.summary==='string'?event.summary.slice(0,300):'Compromisso sem título',start,end,allDay,url:safeEventLink(event.htmlLink),etag:event.etag,recurring:Boolean(event.recurringEventId),description:typeof event.description==='string'?event.description:'',location:typeof event.location==='string'?event.location:'',editable:event.organizer?.self===true&&!event.attendees?.length&&(!event.eventType||event.eventType==='default')&&!event.recurrence?.length};
+ return {id:event.id,title:typeof event.summary==='string'?event.summary.slice(0,300):'Compromisso sem título',start,end,allDay,url:safeEventLink(event.htmlLink),colorId:typeof event.colorId==='string'&&/^\d{1,3}$/.test(event.colorId)?event.colorId:undefined,backgroundColor:undefined as string|undefined,etag:event.etag,recurring:Boolean(event.recurringEventId),description:typeof event.description==='string'?event.description:'',location:typeof event.location==='string'?event.location:'',editable:event.organizer?.self===true&&!event.attendees?.length&&(!event.eventType||event.eventType==='default')&&!event.recurrence?.length};
 }
 export function eventInput(input:any){
  if(!input||typeof input.title!=='string'||!input.title.trim()||input.title.length>300||typeof input.allDay!=='boolean')throw new CalendarError(400,'Informe título e período válidos.');
@@ -100,13 +100,25 @@ export function createCalendarApi(deps:Dependencies){return async(request:Reques
   const events=[];let next:string|undefined;
   for(let page=0;page<10;page++){
    const url=new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
-   url.search=new URLSearchParams({timeMin:range!.min,timeMax:range!.max,singleEvents:'true',maxResults:'1000',fields:'nextPageToken,items(id,status,summary,start,end,htmlLink,etag,recurringEventId,recurrence,organizer(self),attendees(self),eventType,description,location)',...(next?{pageToken:next}:{})}).toString();
+   url.search=new URLSearchParams({timeMin:range!.min,timeMax:range!.max,singleEvents:'true',maxResults:'1000',fields:'nextPageToken,items(id,status,summary,start,end,htmlLink,colorId,etag,recurringEventId,recurrence,organizer(self),attendees(self),eventType,description,location)',...(next?{pageToken:next}:{})}).toString();
    const response=await deps.fetch(url,{headers:{Authorization:`Bearer ${token.access_token}`},signal:AbortSignal.timeout(12000)});
    if(!response.ok)throw new CalendarError(response.status===401||response.status===403?409:502,'Não foi possível ler a agenda. Confira a autorização ou tente novamente.');
    const data=await response.json();if(!Array.isArray(data.items)&&data.items!==undefined)throw new CalendarError(502,'Resposta de agenda inválida.');
    for(const value of data.items||[]){const event=normalizeEvent(value);if(event)events.push(event);}
    next=data.nextPageToken;if(!next)break;
    if(page===9)throw new CalendarError(422,'Há eventos demais neste período. Nenhuma lista parcial será exibida.');
+  }
+  // Palette failure must not hide commitments. No extra OAuth scopes or provider writes.
+  if(events.some(event=>event.colorId)){
+   try{
+    const paletteResponse=await deps.fetch('https://www.googleapis.com/calendar/v3/colors',{headers:{Authorization:`Bearer ${token.access_token}`},signal:AbortSignal.timeout(4000)});
+    if(paletteResponse.ok){
+     const palette=await paletteResponse.json();
+     for(const event of events){const background=event.colorId?palette?.event?.[event.colorId]?.background:undefined;
+      if(typeof background==='string'&&/^#[0-9a-f]{6}$/i.test(background))event.backgroundColor=background;
+     }
+    }
+   }catch{/* Keep the default card color if the optional palette is unavailable. */}
   }
   // Do not return an in-flight result after disconnect/reconnect.
   const current=await store('status');if(!current?.connected||current.revision!==connection.revision)throw new CalendarError(409,'A conexão mudou. Atualize a agenda.');

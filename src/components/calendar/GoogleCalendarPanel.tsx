@@ -1,3 +1,4 @@
+import { googleEventColors } from '../../services/googleCalendarColors';
 import { CalendarDays } from 'lucide-react';
 import type { GoogleCalendarStatus,GoogleCalendarEvent } from '../../types/googleCalendar';
 export function GoogleCalendarPanel({status,loading,busy,error,onConnect,onDisconnect,onRefresh,canWrite=false,onCreate}:{canWrite?:boolean;onCreate?:()=>void;status:GoogleCalendarStatus|null;loading:boolean;busy:boolean;error:string;onConnect:()=>void;onDisconnect:()=>void;onRefresh:()=>void}) {
@@ -7,7 +8,8 @@ export function GoogleCalendarPanel({status,loading,busy,error,onConnect,onDisco
 export function GoogleEventCard({event,zone,compact=false,onSelect}:{onSelect?:(event:GoogleCalendarEvent)=>void;event:GoogleCalendarEvent;zone:string;compact?:boolean}){
  const time=event.allDay?'Dia inteiro':new Intl.DateTimeFormat('pt-BR',{timeZone:zone,hour:'2-digit',minute:'2-digit'}).format(new Date(event.start));
  const body=compact?<span className="block truncate">{time} · {event.title}</span>:<><span className="block text-[10px] font-semibold">Google · {time}</span><span className="block break-words text-xs">{event.title}</span></>;
+ const colors=googleEventColors(event.backgroundColor);
  const style=(compact?'truncate text-xs ':'')+'block rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-blue-900';
- if(onSelect)return <button type="button" onClick={()=>onSelect(event)} aria-label={`Ver compromisso: ${event.title}`} className={style+' w-full text-left'}>{body}</button>;
- return event.url?<a href={event.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir no Google Agenda: ${event.title}`} className={style}>{body}</a>:<div className={style}>{body}</div>;
+ if(onSelect)return <button type="button" onClick={()=>onSelect(event)} aria-label={`Ver compromisso: ${event.title}`} style={colors} className={style+' w-full text-left'}>{body}</button>;
+ return event.url?<a href={event.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir no Google Agenda: ${event.title}`} style={colors} className={style}>{body}</a>:<div style={colors} className={style}>{body}</div>;
 }

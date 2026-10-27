@@ -7,9 +7,9 @@ async function moduleAt(path){const context=createContext({Request,Response,URL,
 const core=await moduleAt('../../supabase/functions/_shared/google-calendar-core.ts');
 const projection=await moduleAt('../../src/services/googleCalendarContracts.ts');
 const event={id:'test-event',summary:'Reunião fictícia',status:'confirmed',start:{date:'2026-10-18'},end:{date:'2026-10-19'},htmlLink:'https://calendar.google.com/calendar/event?eid=test'};
-function setup({configured=true,identityError=false,connected=true,pages=[{items:[event]}],statusRevision='r1',fetchFail=null,consume=true}={}){
+function setup({configured=true,identityError=false,connected=true,pages=[{items:[event]}],statusRevision='r1',fetchFail=null,consume=true,palette={event:{"2":{background:"#33b679"}}},paletteFails=false}={}){
  const stores=[],requests=[];let stateUsed=false,page=0;
- const deps={env:key=>({GOOGLE_CALENDAR_CLIENT_ID:configured?'fictional-client':null,GOOGLE_CALENDAR_CLIENT_SECRET:configured?'fictional-secret':null,SUPABASE_URL:'https://example.supabase.co'})[key],identity:async()=>{if(identityError)throw new core.CalendarError(401,'Sessão inválida');return{userId:'user-a',workspaceId:'workspace-a'};},store:async(action,user,workspace,payload)=>{stores.push({action,user,workspace,payload});if(action==='status')return{connected,revision:statusRevision};if(action==='token')return connected?{refresh_token:'fictional-refresh',revision:'r1'}:null;if(action==='consume_state'){if(stateUsed||!consume)return null;stateUsed=true;return{user_id:'user-a',workspace_id:'workspace-a',revision:'r1'};}return{ok:true};},fetch:async(url,options)=>{requests.push({url:String(url),options});if(fetchFail&&requests.length===fetchFail)return new Response('{}',{status:503});if(String(url).includes('oauth2.googleapis.com/token'))return Response.json({access_token:'fictional-access',refresh_token:'fictional-refresh',scope:core.READ_SCOPE});return Response.json(pages[page++]);}};
+ const deps={env:key=>({GOOGLE_CALENDAR_CLIENT_ID:configured?'fictional-client':null,GOOGLE_CALENDAR_CLIENT_SECRET:configured?'fictional-secret':null,SUPABASE_URL:'https://example.supabase.co'})[key],identity:async()=>{if(identityError)throw new core.CalendarError(401,'Sessão inválida');return{userId:'user-a',workspaceId:'workspace-a'};},store:async(action,user,workspace,payload)=>{stores.push({action,user,workspace,payload});if(action==='status')return{connected,revision:statusRevision};if(action==='token')return connected?{refresh_token:'fictional-refresh',revision:'r1'}:null;if(action==='consume_state'){if(stateUsed||!consume)return null;stateUsed=true;return{user_id:'user-a',workspace_id:'workspace-a',revision:'r1'};}return{ok:true};},fetch:async(url,options)=>{requests.push({url:String(url),options});if(fetchFail&&requests.length===fetchFail)return new Response('{}',{status:503});if(String(url).includes('oauth2.googleapis.com/token'))return Response.json({access_token:'fictional-access',refresh_token:'fictional-refresh',scope:core.READ_SCOPE});if(String(url)==='https://www.googleapis.com/calendar/v3/colors'){if(paletteFails)throw Error('palette unavailable');return Response.json(palette);}return Response.json(pages[page++]);}};
  return{api:core.createCalendarApi(deps),callback:core.createCalendarCallback(deps),stores,requests};
 }
 const request=body=>new Request('https://example.supabase.co/functions/v1/google-calendar',{method:'POST',headers:{Origin:core.OFFICE_ORIGIN},body:JSON.stringify(body)});
@@ -31,3 +31,31 @@ test('external event URLs are allowlisted and cannot execute scripts',()=>{for(c
 test('all-day event exclusive end never adds an extra day',()=>{const data=projection.projectGoogleEvents([{id:'a',title:'Fictício',start:'2026-10-18',end:'2026-10-20',allDay:true}],['2026-10-18','2026-10-19','2026-10-20'],'America/Sao_Paulo');assert.equal(Object.keys(data).join(','),'2026-10-18,2026-10-19');});
 test('timed events respect local zone and midnight exclusive end',()=>{const data=projection.projectGoogleEvents([{id:'a',title:'Fictício',start:'2026-10-19T01:00:00Z',end:'2026-10-19T03:00:00Z',allDay:false}],['2026-10-18','2026-10-19'],'America/Sao_Paulo');assert.equal(Object.keys(data).join(','),'2026-10-18');});
 test('duplicate events and text filters do not duplicate displayed cards',()=>{const e={id:'a',title:'Reunião',start:'2026-10-18',end:'2026-10-19',allDay:true};assert.equal(projection.projectGoogleEvents([e,e],['2026-10-18'],'America/Sao_Paulo','reunião')['2026-10-18'].length,1);assert.equal(Object.keys(projection.projectGoogleEvents([e],['2026-10-18'],'America/Sao_Paulo','outro')).length,0);});
+
+const colorStyles=await moduleAt('../../src/services/googleCalendarColors.ts');
+test('provider colors survive list and day projection without provider writes',async()=>{
+ const s=setup({pages:[{items:[{...event,colorId:'2'}]}]});
+ const result=await(await s.api(request({action:'events',from:'2026-10-01',until:'2026-10-31'}))).json();
+ assert.equal(result.events[0].backgroundColor,'#33b679');
+ assert.equal(projection.projectGoogleEvents(result.events,['2026-10-18'],'America/Sao_Paulo')['2026-10-18'][0].backgroundColor,'#33b679');
+ assert.equal(s.requests.filter(x=>x.url==='https://www.googleapis.com/calendar/v3/colors').length,1);
+ assert.ok(s.requests[1].url.includes('colorId'));
+ assert.ok(s.requests.filter(x=>!x.url.includes('oauth2.googleapis.com')).every(x=>!x.options.method));
+});
+test('missing, unknown or unsafe palette colors retain events with default appearance',async()=>{
+ for(const options of [{paletteFails:true},{palette:{event:{}}},{palette:{event:{'2':{background:'url(https://foreign.test)'}}}}]){
+  const s=setup({...options,pages:[{items:[{...event,colorId:'2'}]}]});
+  const result=await(await s.api(request({action:'events',from:'2026-10-01',until:'2026-10-31'}))).json();
+  assert.equal(result.events.length,1);assert.equal(result.events[0].backgroundColor,undefined);
+ }
+ const s=setup();await s.api(request({action:'events',from:'2026-10-01',until:'2026-10-31'}));
+ assert.equal(s.requests.some(x=>x.url.endsWith('/colors')),false);
+});
+test('card colors reject CSS injection and choose contrasting black or white text',()=>{
+ for(const value of [undefined,'red','#fff','url(x)','#123456;display:none'])assert.equal(colorStyles.googleEventColors(value),undefined);
+ assert.equal(colorStyles.googleEventColors('#ffffff').color,'#000000');
+ assert.equal(colorStyles.googleEventColors('#000000').color,'#ffffff');
+ for(const color of ['#a4bdfc','#7ae7bf','#dbadff','#ff887c','#fbd75b','#ffb878','#46d6db','#e1e1e1','#5484ed','#51b749','#dc2127']){
+  assert.ok(['#000000','#ffffff'].includes(colorStyles.googleEventColors(color).color));
+ }
+});
